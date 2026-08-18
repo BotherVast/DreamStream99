@@ -9,18 +9,16 @@ window.WT_CONFIG = {
 
   /**
    * 字体
-   * - UI / 正文：优先使用系统字体，保证 1× 缩放时中英文清晰可读
-   * - Logo / 大标题：使用 98.css 的 Pixelated MS Sans Serif
-   * - 方正像素 12 / 文泉驿点阵宋体只作为复古展示字体的中文回退
+   * - 英文 / 拉丁字符：98.css 的 Pixelated MS Sans Serif
+   * - 中文：文泉驿点阵宋体 12px
+   * - UI、正文和标题统一使用本地点阵字体栈
    *
    * 字体默认从项目内加载，避免 CDN 不可用时退回系统字体并破坏布局。
-   * 如需更换字体，请同步修改下面 URL 与 /css/fonts.css 中的字体声明。
+   * 如以后有自己合法可用的网页字体，只改下面 URL 即可。
    */
   fonts: {
     latinRegularUrl: '/assets/fonts/ms_sans_serif.woff',
     latinBoldUrl: '/assets/fonts/ms_sans_serif_bold.woff',
-    // 取得 Web 嵌入授权后可填写方正像素12文件路径；留空时只尝试本机已安装字体。
-    preferredCjkUrl: '',
     cjkUrl: '/assets/fonts/WenQuanYi-Bitmap-Song-12px.ttf',
   },
 
@@ -28,8 +26,8 @@ window.WT_CONFIG = {
     desktop: '#008080',
     titleBar: '#000080',
     titleBarActive: '#000080',
-    fontFamily: 'Tahoma, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif',
-    displayFontFamily: '"Pixelated MS Sans Serif", "FZ Pixel 12", "WenQuanYi Bitmap Song 12px", Tahoma, sans-serif',
+    fontFamily: '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif',
+    displayFontFamily: '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif',
   },
 
   /**

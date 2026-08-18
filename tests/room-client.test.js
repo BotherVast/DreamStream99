@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DemoRoomClient, SocketIoRoomClient, createRoomClient } from '../public/js/room-client.js';
+import { DemoRoomClient, createRoomClient } from '../public/js/room-client.js';
 
 test('createRoomClient defaults to the static demo transport', () => {
   assert.ok(createRoomClient() instanceof DemoRoomClient);
-  assert.ok(createRoomClient({ mode: 'socketio' }) instanceof SocketIoRoomClient);
 });
 
 test('demo client joins with simulated members and messages', async () => {

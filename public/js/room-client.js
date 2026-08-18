@@ -1,44 +1,4 @@
 const DEFAULT_PERMISSIONS = Object.freeze({ guestControl: false, guestChat: true });
-let socketIoLoaderPromise = null;
-
-function loadSocketIoClient(url = '/socket.io/socket.io.js') {
-  if (typeof window.io === 'function') return Promise.resolve(window.io);
-  if (socketIoLoaderPromise) return socketIoLoaderPromise;
-  socketIoLoaderPromise = new Promise((resolve, reject) => {
-    const existing = document.querySelector('script[data-socket-io-client]');
-    const script = existing || document.createElement('script');
-    let timeout;
-    const cleanup = () => {
-      clearTimeout(timeout);
-      script.removeEventListener('load', onLoad);
-      script.removeEventListener('error', onError);
-    };
-    const fail = (error) => {
-      cleanup();
-      script.remove();
-      reject(error);
-    };
-    const onLoad = () => {
-      cleanup();
-      if (typeof window.io !== 'function') return fail(new Error('Socket.IO client failed to initialize'));
-      resolve(window.io);
-    };
-    const onError = () => fail(new Error('Socket.IO client failed to load'));
-    timeout = setTimeout(() => fail(new Error('Socket.IO client loading timed out')), 10000);
-    script.addEventListener('load', onLoad, { once: true });
-    script.addEventListener('error', onError, { once: true });
-    if (!existing) {
-      script.src = url;
-      script.async = true;
-      script.dataset.socketIoClient = 'true';
-      document.head.appendChild(script);
-    }
-  }).catch((error) => {
-    socketIoLoaderPromise = null;
-    throw error;
-  });
-  return socketIoLoaderPromise;
-}
 
 function randomId() {
   return globalThis.crypto?.randomUUID?.()
@@ -213,68 +173,10 @@ export class DemoRoomClient extends RoomClient {
   }
 }
 
-export class SocketIoRoomClient extends RoomClient {
-  constructor(runtime = {}) {
-    super();
-    this.runtime = runtime;
-    this.socket = null;
-    this.socketPromise = null;
-  }
-
-  async ensureSocket() {
-    if (this.socket) return this.socket;
-    if (this.socketPromise) return this.socketPromise;
-    this.socketPromise = (async () => {
-      const io = await loadSocketIoClient(this.runtime.socketIoClientUrl);
-      const socket = io(this.runtime.socketIoUrl || undefined, {
-        transports: ['websocket', 'polling'],
-      });
-      this.socket = socket;
-      socket.on('connect', () => this.emit('connection', { state: 'connected' }));
-      socket.on('disconnect', () => this.emit('connection', { state: 'disconnected' }));
-      socket.on('connect_error', () => this.emit('connection', { state: 'disconnected' }));
-      socket.on('presence:update', (payload) => this.emit('presence', payload));
-      socket.on('playback:state', (payload) => this.emit('playback', payload));
-      socket.on('chat:message', (payload) => this.emit('chat', payload));
-      socket.on('room:permissions', (payload) => this.emit('permissions', payload));
-      return socket;
-    })().catch((error) => {
-      this.socket = null;
-      this.socketPromise = null;
-      throw error;
-    });
-    return this.socketPromise;
-  }
-
-  async request(eventName, payload) {
-    const socket = await this.ensureSocket();
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error(`${eventName} timed out`)), 10000);
-      socket.emit(eventName, payload, (response) => {
-        clearTimeout(timeout);
-        resolve(response);
-      });
-    });
-  }
-
-  join(payload) { return this.request('room:join', payload); }
-  sendPlayback(payload) { return this.request('playback:command', payload); }
-  sendChat(payload) { return this.request('chat:send', payload); }
-  updatePermissions(payload) { return this.request('room:permissions:update', payload); }
-  ping(payload = {}) { return this.request('time:ping', payload); }
-
-  close() {
-    this.socket?.disconnect();
-    this.socket = null;
-    this.socketPromise = null;
-  }
-}
-
 /**
  * Native WebSocket transport for the future Cloudflare Worker + Durable Object.
- * Frames use { type, requestId?, payload? }; replies use
- * { type: 'response', requestId, ok, ... }, while broadcasts use the event
- * names handled in handleMessage().
+ * Frames use { type, requestId?, payload? }; responses use
+ * { type: 'response', requestId, ok, payload? }.
  */
 export class WebSocketRoomClient extends RoomClient {
   constructor({ websocketUrl }) {
@@ -375,7 +277,6 @@ export class WebSocketRoomClient extends RoomClient {
 
 export function createRoomClient(runtime = {}) {
   if ((runtime.mode || 'demo') === 'demo') return new DemoRoomClient();
-  if (runtime.mode === 'socketio') return new SocketIoRoomClient(runtime);
   if (runtime.mode === 'websocket') return new WebSocketRoomClient(runtime);
   throw new Error(`Unsupported WT_RUNTIME mode: ${runtime.mode}`);
 }

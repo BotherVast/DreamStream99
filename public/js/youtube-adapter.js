@@ -54,6 +54,10 @@ function loadYouTubeApi() {
   return apiPromise;
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export class YouTubeAdapter {
   constructor(hostElement, callbacks = {}) {
     this.hostElement = hostElement;
@@ -194,11 +198,7 @@ export class YouTubeAdapter {
         if (state !== window.YT.PlayerState.CUED && state !== window.YT.PlayerState.PAUSED) {
           this.player.pauseVideo();
         }
-        await this.waitForPlayerStates([
-          window.YT.PlayerState.PAUSED,
-          window.YT.PlayerState.CUED,
-          window.YT.PlayerState.ENDED,
-        ], 1200);
+        await delay(0);
       } else {
         this.player.playVideo();
         await this.ensurePlaybackStarted();
@@ -207,19 +207,17 @@ export class YouTubeAdapter {
   }
 
   async ensurePlaybackStarted() {
-    const started = await this.waitForPlayerStates([window.YT.PlayerState.PLAYING], 1600);
+    const started = await this.waitForPlayerState(window.YT.PlayerState.PLAYING, 1600);
     if (!started && this.shouldBePlaying) await this.recoverMutedAutoplay();
   }
 
-  waitForPlayerStates(expectedStates, timeoutMs) {
+  waitForPlayerState(expectedState, timeoutMs) {
     return new Promise((resolve) => {
       const startedAt = performance.now();
-      let frames = 0;
       const check = () => {
-        if (!this.player) return resolve(false);
-        if (frames > 0 && expectedStates.includes(this.player.getPlayerState?.())) return resolve(true);
+        if (!this.player || !this.shouldBePlaying) return resolve(false);
+        if (this.player.getPlayerState?.() === expectedState) return resolve(true);
         if (performance.now() - startedAt >= timeoutMs) return resolve(false);
-        frames += 1;
         requestAnimationFrame(check);
       };
       check();
@@ -232,7 +230,7 @@ export class YouTubeAdapter {
       this.player?.mute?.();
       this.player?.playVideo?.();
       this.callbacks.onMutedAutoplay?.();
-      await this.waitForPlayerStates([window.YT.PlayerState.PLAYING], 2200);
+      await this.waitForPlayerState(window.YT.PlayerState.PLAYING, 2200);
     })().finally(() => {
       this.autoplayRecoveryPromise = null;
     });
@@ -252,10 +250,7 @@ export class YouTubeAdapter {
     if (Math.abs(drift) <= threshold) return;
     this.runRemoteOperation(async () => {
       this.player.seekTo(Math.max(0, targetSeconds), true);
-      const expectedStates = paused
-        ? [window.YT.PlayerState.PAUSED, window.YT.PlayerState.CUED, window.YT.PlayerState.ENDED]
-        : [window.YT.PlayerState.PLAYING];
-      await this.waitForPlayerStates(expectedStates, 1200);
+      await delay(0);
     });
   }
 
