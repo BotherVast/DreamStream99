@@ -15,7 +15,7 @@
 const overrides = {
   desktopBackground: '/assets/custom/clouds.gif',
   site: {
-    mediaHeaderLogo: '/assets/custom/pixelstream-logo.gif',
+    mediaHeaderLogo: '/assets/custom/dreamstream-logo.gif',
     mediaHeaderBackground: '/assets/custom/stars.gif',
     mediaPageBackground: '/assets/custom/paper.gif',
     chatHeaderLogo: '/assets/custom/chat-logo.gif',

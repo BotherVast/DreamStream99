@@ -1,17 +1,17 @@
 /**
- * Watch Together - 快速配置
+ * DreamStream 99 - 快速配置
  * -------------------------
  * 绝大多数会展示给用户看的文案、90 年代网站信息、桌面图标和基础配色都放在这里。
  * 修改后保存并刷新网页即可，无需重新编译。
  */
 window.WT_CONFIG = {
-  siteName: 'PixelStream 99',
+  siteName: 'DreamStream 99',
 
   /**
    * 字体
-   * - UI / 正文：优先使用系统字体，保证 1× 缩放时中英文清晰可读
-   * - Logo / 大标题：使用 98.css 的 Pixelated MS Sans Serif
-   * - 文泉驿点阵宋体保留为复古展示字体的中文回退
+   * - 英文 / 拉丁字符：98.css 的 Pixelated MS Sans Serif
+   * - 中文：文泉驿点阵宋体 12px
+   * - UI、正文和标题统一使用本地点阵字体栈
    *
    * 字体默认从项目内加载，避免 CDN 不可用时退回系统字体并破坏布局。
    * 如以后有自己合法可用的网页字体，只改下面 URL 即可。
@@ -26,8 +26,8 @@ window.WT_CONFIG = {
     desktop: '#008080',
     titleBar: '#000080',
     titleBarActive: '#000080',
-    fontFamily: 'Tahoma, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif',
-    displayFontFamily: '"WT MS Sans Pixel", "WT WQY Bitmap Song", Tahoma, sans-serif',
+    fontFamily: '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif',
+    displayFontFamily: '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif',
   },
 
   /**
@@ -123,12 +123,12 @@ window.WT_CONFIG = {
   ],
 
   oldWeb: {
-    mediaBrand: 'PixelStream 99',
+    mediaBrand: 'DreamStream 99',
     mediaTagline: 'WATCH TOGETHER · ANYWHERE ON THE WEB!',
     chatBrand: 'Dial-Up Lounge',
     chatTagline: 'THE CHAT SPOT!',
-    copyright: '© 1998-1999 PixelStream 99. All rights reserved.',
-    webmaster: 'webmaster@pixelstream99.local',
+    copyright: '© 1998-1999 DreamStream 99. All rights reserved.',
+    webmaster: 'webmaster@dreamstream99.local',
     lastUpdated: 'Last updated: Aug. 17, 1999',
     visitorNumber: '00487213',
     bestViewed: 'Best viewed at 800×600 · 16-bit color',
@@ -137,7 +137,7 @@ window.WT_CONFIG = {
 
   copy: {
     // 两个“浏览器窗口”
-    mediaTitle: 'PixelStream 99 - Watch Together! - Microsoft Internet Explorer',
+    mediaTitle: 'DreamStream 99 - Watch Together! - Microsoft Internet Explorer',
     chatTitle: 'Dial-Up Lounge - The Chat Spot! - Microsoft Internet Explorer',
     menuFile: '文件',
     menuEdit: '编辑',
@@ -185,7 +185,7 @@ window.WT_CONFIG = {
     emptyTitle: 'NO VIDEO LOADED',
     emptyText: 'Paste a video URL below.',
     featuredDownload: 'FEATURED DOWNLOAD',
-    featuredName: 'PixelStream Player 2.0',
+    featuredName: 'DreamStream Player 2.0',
     featuredCopy: 'Faster. Better. Totally Rad.',
     featuredLink: 'Download Now!',
     topFive: 'TOP 5 THIS WEEK',
@@ -231,7 +231,15 @@ window.WT_CONFIG = {
     statusJoinFailed: '连接失败',
     statusOnline: '已连接',
     statusReconnecting: '重拨中…',
-    providerYouTube: 'YouTube',
+    youtubeLabel: 'YouTube',
+    roleOwner: '房主',
+    roleGuest: '访客',
+    ownerSuffix: '［房主］',
+    guestPermissions: '访客权限',
+    allowGuestControl: '允许控制播放',
+    allowGuestChat: '允许发送聊天',
+    retryPlayer: '重试',
+    unmuteAndSync: '📢 点击取消静音并同步',
 
     ariaPlay: '播放',
     ariaPause: '暂停',
@@ -239,16 +247,19 @@ window.WT_CONFIG = {
     ariaForward: '前进 10 秒',
     ariaFullscreen: '全屏',
 
-    toastAutoplayBlocked: '请点击播放按钮启用播放。',
+    toastAutoplayMuted: '浏览器阻止了有声自动播放，已静音继续同步。',
     toastYoutubeError: 'YouTube 播放器错误：{code}',
     toastJoinFailed: '无法连接到房间。',
+    toastRoomCreateFailed: '创建房间失败，请刷新页面重试。',
     toastSyncFailed: '播放器同步失败。',
     toastJoinFirst: '请先连接房间。',
     toastCommandFailed: '同步失败。',
+    toastNoControl: '房主没有开放播放控制权限。',
+    toastPermissionsFailed: '房间权限更新失败。',
     toastPasteLink: '请粘贴视频链接。',
     toastInvalidLink: '无法识别这个链接。',
     toastYoutubeMissingId: 'YouTube 链接缺少视频 ID。',
-    toastUnsupportedProvider: '仅支持 YouTube 视频地址。',
+    toastUnsupportedLink: '仅支持 YouTube 视频地址。',
     toastInvalidTime: '无法识别时间。',
     toastInviteCopied: '邀请链接已复制。',
     toastCopyFailed: '复制失败。',

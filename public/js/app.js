@@ -8,7 +8,7 @@ if (!config?.copy || !config?.theme) {
   throw new Error('WT_CONFIG is missing. Check /public/config.js');
 }
 const copy = config.copy;
-const CAPTURE_FONT_FAMILY = config.theme?.fontFamily || 'Tahoma, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif';
+const CAPTURE_FONT_FAMILY = config.theme?.fontFamily || '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif';
 
 function t(key, values = {}) {
   const template = copy[key];
@@ -86,7 +86,13 @@ const els = {
   emptyPlayer: $('#emptyPlayer'),
   youtubeSurface: $('#youtubeSurface'),
   youtubeHost: $('#youtubeHost'),
-  providerBadge: $('#providerBadge'),
+  youtubeBadge: $('#youtubeBadge'),
+  youtubeInteractionShield: $('#youtubeInteractionShield'),
+  playerErrorOverlay: $('#playerErrorOverlay'),
+  playerErrorMessage: $('#playerErrorMessage'),
+  retryPlayerButton: $('#retryPlayerButton'),
+  unmuteOverlay: $('#unmuteOverlay'),
+  unmuteButton: $('#unmuteButton'),
   playButton: $('#playButton'),
   backButton: $('#backButton'),
   forwardButton: $('#forwardButton'),
@@ -110,19 +116,33 @@ const els = {
   chatRoomMirror: $('#chatRoomMirror'),
   mediaAddress: $('#mediaAddress'),
   chatAddress: $('#chatAddress'),
+  roleBadge: $('#roleBadge'),
+  roomPermissions: $('#roomPermissions'),
+  guestControlInput: $('#guestControlInput'),
+  guestChatInput: $('#guestChatInput'),
 };
 
-const roomId = getOrCreateRoomId();
+let roomContext;
+try {
+  roomContext = await getOrCreateRoomContext();
+} catch (error) {
+  els.toast.textContent = error.message || t('toastRoomCreateFailed');
+  els.toast.classList.add('show');
+  throw error;
+}
+const { roomId, accessToken } = roomContext;
 els.roomLabel.textContent = roomId;
 els.joinRoomLabel.textContent = roomId;
 if (els.chatRoomMirror) els.chatRoomMirror.textContent = roomId;
-if (els.mediaAddress) els.mediaAddress.textContent = `http://www.pixelstream99.local/watch.php?room=${roomId.toLowerCase()}`;
+if (els.mediaAddress) els.mediaAddress.textContent = `http://www.dreamstream99.local/watch.php?room=${roomId.toLowerCase()}`;
 if (els.chatAddress) els.chatAddress.textContent = `http://www.dialuplounge.local/room/${roomId.toLowerCase()}.shtml`;
 els.nicknameInput.value = localStorage.getItem('watchTogether.nickname') || '';
 
 let activeNickname = '';
 let joined = false;
 let clientId = null;
+let activeRole = null;
+let permissions = { guestControl: false, guestChat: true };
 let playback = null;
 let appliedRevision = -1;
 let serverOffsetMs = 0;
@@ -130,27 +150,44 @@ let draggingSeek = false;
 let reconnecting = false;
 let toastTimer = null;
 let messageHistory = [];
+let clockCalibrationTimer = null;
 const mediaMetadataCache = new Map();
 
 const youtube = new YouTubeAdapter(els.youtubeHost, {
   onPlay: (position) => sendPlayback('play', { position }),
   onPause: (position) => sendPlayback('pause', { position }),
   onRateChange: (rate, position) => sendPlayback('rate', { rate, position }),
-  onAutoplayBlocked: () => toast(t('toastAutoplayBlocked')),
+  onEnded: (position) => {
+    if (activeRole === 'owner') sendPlayback('end', { position });
+  },
+  onMutedAutoplay: () => {
+    els.unmuteOverlay.classList.remove('is-hidden');
+    toast(t('toastAutoplayMuted'));
+  },
+  onInitError: (error) => showPlayerError(error?.message),
   onError: (code) => toast(t('toastYoutubeError', { code })),
 });
 
-function getOrCreateRoomId() {
+async function getOrCreateRoomContext() {
   const url = new URL(window.location.href);
-  let code = (url.searchParams.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
-  if (code.length < 4) {
-    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    const bytes = crypto.getRandomValues(new Uint8Array(6));
-    code = [...bytes].map((b) => alphabet[b % alphabet.length]).join('');
-    url.searchParams.set('room', code);
-    history.replaceState(null, '', url);
+  const roomId = (url.searchParams.get('room') || '').toUpperCase();
+  const fragment = new URLSearchParams(url.hash.slice(1));
+  const token = fragment.get('token');
+  if (/^[A-Z0-9]{4,12}$/.test(roomId) && token) {
+    return { roomId, accessToken: token, guestToken: fragment.get('guest') || null };
   }
-  return code;
+
+  const response = await fetch('/api/rooms', { method: 'POST' });
+  if (!response.ok) throw new Error(t('toastRoomCreateFailed'));
+  const created = await response.json();
+  if (!/^[A-Z0-9]{4,12}$/.test(created.roomId) || !created.ownerToken || !created.guestToken) {
+    throw new Error(t('toastRoomCreateFailed'));
+  }
+
+  url.searchParams.set('room', created.roomId);
+  url.hash = new URLSearchParams({ token: created.ownerToken, guest: created.guestToken }).toString();
+  history.replaceState(null, '', url);
+  return { roomId: created.roomId, accessToken: created.ownerToken, guestToken: created.guestToken };
 }
 
 function setConnectionState(label, state) {
@@ -172,26 +209,28 @@ function joinRoom(nickname, { silent = false } = {}) {
   localStorage.setItem('watchTogether.nickname', clean);
   setConnectionState(t('statusJoining'), 'syncing');
 
-  socket.emit('room:join', { roomId, nickname: clean }, (response) => {
+  socket.emit('room:join', { roomId, token: accessToken, nickname: clean }, async (response) => {
     if (!response?.ok) {
       setConnectionState(t('statusJoinFailed'), 'offline');
       toast(response?.error || t('toastJoinFailed'));
       return;
     }
     clientId = response.clientId;
+    activeRole = response.role;
     joined = true;
     reconnecting = false;
     setConnectionState(t('statusOnline'), 'online');
-    enableChat(true);
     applySnapshot(response.snapshot);
     if (!silent && els.joinDialog.open) els.joinDialog.close();
-    measureClockOffset();
+    await calibrateClockInitially();
+    scheduleClockCalibration();
   });
 }
 
 function applySnapshot(snapshot) {
   if (!snapshot) return;
   serverOffsetMs = snapshot.serverTime - Date.now();
+  applyPermissions(snapshot.permissions || permissions);
   renderMembers(snapshot.members || []);
   messageHistory = Array.isArray(snapshot.messages) ? [...snapshot.messages] : [];
   renderMessageHistory(messageHistory);
@@ -211,12 +250,15 @@ socket.on('disconnect', () => {
   if (activeNickname) reconnecting = true;
   joined = false;
   setConnectionState(t('statusReconnecting'), 'syncing');
-  enableChat(false);
+  activeRole = null;
+  clearTimeout(clockCalibrationTimer);
+  updateCapabilities();
 });
 
 socket.on('presence:update', renderMembers);
 socket.on('playback:state', (payload) => applyPlaybackState(payload, false));
 socket.on('chat:message', (message) => appendMessage(message, true));
+socket.on('room:permissions', applyPermissions);
 
 async function applyPlaybackState(payload, force = false) {
   const incoming = payload?.playback;
@@ -230,21 +272,16 @@ async function applyPlaybackState(payload, force = false) {
 
   playback = incoming;
   appliedRevision = incoming.revision;
-  updateControlsEnabled(Boolean(incoming.mediaId));
+  updateControlsEnabled(Boolean(incoming.videoId));
 
-  if (!incoming.mediaId || !incoming.provider) {
-    showProvider(null);
+  if (!incoming.videoId) {
+    showVideo(false);
     return;
   }
 
   const target = expectedPosition(incoming);
-  if (incoming.provider !== 'youtube') {
-    showProvider(null);
-    toast(t('toastUnsupportedProvider'));
-    return;
-  }
-
-  showProvider('youtube');
+  showVideo(true);
+  hidePlayerError();
   els.rateSelect.value = String(incoming.playbackRate || 1);
   updatePlayVisual(incoming.paused);
   warmMediaMetadata(incoming).catch(() => {});
@@ -252,33 +289,69 @@ async function applyPlaybackState(payload, force = false) {
   try {
     await youtube.apply(incoming, target);
   } catch (error) {
-    toast(error.message || t('toastSyncFailed'));
+    showPlayerError(error.message || t('toastSyncFailed'));
   }
 }
 
-function showProvider(provider) {
-  const hasProvider = provider === 'youtube';
-  els.emptyPlayer.classList.toggle('is-hidden', hasProvider);
-  els.youtubeSurface.classList.toggle('is-hidden', !hasProvider);
-  els.providerBadge.classList.toggle('is-hidden', !hasProvider);
+function showVideo(hasVideo) {
+  els.emptyPlayer.classList.toggle('is-hidden', hasVideo);
+  els.youtubeSurface.classList.toggle('is-hidden', !hasVideo);
+  els.youtubeBadge.classList.toggle('is-hidden', !hasVideo);
 
-  if (hasProvider) els.providerBadge.textContent = t('providerYouTube');
+  if (hasVideo) els.youtubeBadge.textContent = t('youtubeLabel');
 
-  els.rateSelect.disabled = !joined || !hasProvider;
-  els.seekRange.disabled = !joined || !hasProvider;
+  updateControlsEnabled(hasVideo);
 }
 
 function updateControlsEnabled(enabled) {
-  const disabled = !joined || !enabled;
+  const disabled = !joined || !enabled || !canControlPlayback();
   els.playButton.disabled = disabled;
   els.backButton.disabled = disabled;
   els.forwardButton.disabled = disabled;
   els.rateSelect.disabled = disabled;
   els.seekRange.disabled = disabled;
+  els.sourceInput.disabled = !joined || !canControlPlayback();
+  els.loadButton.disabled = !joined || !canControlPlayback();
+}
+
+function canControlPlayback() {
+  return activeRole === 'owner' || (activeRole === 'guest' && permissions.guestControl);
+}
+
+function canSendChat() {
+  return activeRole === 'owner' || (activeRole === 'guest' && permissions.guestChat);
+}
+
+function applyPermissions(nextPermissions) {
+  permissions = {
+    guestControl: Boolean(nextPermissions?.guestControl),
+    guestChat: Boolean(nextPermissions?.guestChat),
+  };
+  els.guestControlInput.checked = permissions.guestControl;
+  els.guestChatInput.checked = permissions.guestChat;
+  updateCapabilities();
+}
+
+function updateCapabilities() {
+  const owner = joined && activeRole === 'owner';
+  els.roomPermissions.hidden = !owner;
+  els.roleBadge.textContent = activeRole === 'owner' ? t('roleOwner') : t('roleGuest');
+  els.roleBadge.classList.toggle('is-hidden', !joined);
+  updateControlsEnabled(Boolean(playback?.videoId));
+  enableChat(joined && canSendChat());
+}
+
+function showPlayerError(message) {
+  els.playerErrorMessage.textContent = message || t('toastSyncFailed');
+  els.playerErrorOverlay.classList.remove('is-hidden');
+}
+
+function hidePlayerError() {
+  els.playerErrorOverlay.classList.add('is-hidden');
 }
 
 function expectedPosition(state = playback) {
-  if (!state?.mediaId) return 0;
+  if (!state?.videoId) return 0;
   if (state.paused) return Math.max(0, state.anchorSeconds || 0);
   const nowServer = Date.now() + serverOffsetMs;
   const elapsed = Math.max(0, nowServer - state.anchorServerMs) / 1000;
@@ -293,7 +366,8 @@ function actualOrExpectedPosition() {
 
 function sendPlayback(action, extra = {}) {
   if (!joined) return toast(t('toastJoinFirst'));
-  if (action !== 'load' && !playback?.mediaId) return;
+  if (!canControlPlayback()) return toast(t('toastNoControl'));
+  if (action !== 'load' && !playback?.videoId) return;
 
   const command = {
     action,
@@ -322,22 +396,22 @@ function parseMediaInput(raw) {
 
   const host = url.hostname.replace(/^www\./, '').toLowerCase();
   if (host === 'youtu.be') {
-    const mediaId = url.pathname.split('/').filter(Boolean)[0];
-    if (!isYouTubeId(mediaId)) throw new Error(t('toastYoutubeMissingId'));
-    return { provider: 'youtube', mediaId, position: parseStartTime(url) };
+    const videoId = url.pathname.split('/').filter(Boolean)[0];
+    if (!isYouTubeId(videoId)) throw new Error(t('toastYoutubeMissingId'));
+    return { videoId, position: parseStartTime(url) };
   }
 
   const isYouTubeHost = host === 'youtube.com' || host.endsWith('.youtube.com');
   const isYouTubeNoCookieHost = host === 'youtube-nocookie.com' || host.endsWith('.youtube-nocookie.com');
   if (isYouTubeHost || isYouTubeNoCookieHost) {
     const parts = url.pathname.split('/').filter(Boolean);
-    let mediaId = url.searchParams.get('v');
-    if (!mediaId && ['shorts', 'embed', 'live'].includes(parts[0])) mediaId = parts[1];
-    if (!isYouTubeId(mediaId)) throw new Error(t('toastYoutubeMissingId'));
-    return { provider: 'youtube', mediaId, position: parseStartTime(url) };
+    let videoId = url.searchParams.get('v');
+    if (!videoId && ['shorts', 'embed', 'live'].includes(parts[0])) videoId = parts[1];
+    if (!isYouTubeId(videoId)) throw new Error(t('toastYoutubeMissingId'));
+    return { videoId, position: parseStartTime(url) };
   }
 
-  throw new Error(t('toastUnsupportedProvider'));
+  throw new Error(t('toastUnsupportedLink'));
 }
 
 function isYouTubeId(value) {
@@ -387,7 +461,8 @@ function renderMembers(members) {
     avatar.className = 'member-avatar';
     avatar.textContent = (member.nickname || '?').slice(0, 1).toUpperCase();
     const name = document.createElement('span');
-    name.textContent = member.nickname + (member.clientId === clientId ? t('youSuffix') : '');
+    const role = member.role === 'owner' ? ` ${t('ownerSuffix')}` : '';
+    name.textContent = member.nickname + role + (member.clientId === clientId ? t('youSuffix') : '');
     chip.append(avatar, name);
     els.members.append(chip);
   }
@@ -434,13 +509,13 @@ function appendMessage(message, shouldScroll) {
 
 
 async function warmMediaMetadata(state = playback) {
-  if (state?.provider !== 'youtube' || !state.mediaId) return null;
-  const cacheKey = `${state.provider}:${state.mediaId}`;
+  if (!state?.videoId) return null;
+  const cacheKey = state.videoId;
   if (mediaMetadataCache.has(cacheKey)) return mediaMetadataCache.get(cacheKey);
 
-  const title = youtube.getVideoTitle?.() || state.mediaId;
+  const title = youtube.getVideoTitle?.() || state.videoId;
 
-  const meta = { provider: state.provider, mediaId: state.mediaId, title };
+  const meta = { videoId: state.videoId, title };
   mediaMetadataCache.set(cacheKey, meta);
   return meta;
 }
@@ -527,7 +602,7 @@ function fitRect(srcW, srcH, dstW, dstH) {
 
 async function captureVideoSurfaceCanvas() {
   const target = els.youtubeSurface;
-  if (playback?.provider !== 'youtube' || !playback.mediaId) throw new Error(t('toastCaptureNeedVideo'));
+  if (!playback?.videoId) throw new Error(t('toastCaptureNeedVideo'));
   if (!navigator.mediaDevices?.getDisplayMedia) throw new Error(t('toastCaptureFailed'));
 
   toast(t('toastCapturePickTab'));
@@ -643,7 +718,7 @@ function buildCombinedCapture(frameCanvas, chatCanvas, title, seconds) {
   ctx.fillStyle = '#008080';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const left = drawWindowShell(ctx, 0, 0, 1024, 1024, `${config.oldWeb?.mediaBrand || 'PixelStream 99'} - ${title}`);
+  const left = drawWindowShell(ctx, 0, 0, 1024, 1024, `${config.oldWeb?.mediaBrand || 'DreamStream 99'} - ${title}`);
   ctx.fillStyle = '#000000';
   ctx.fillRect(left.x, left.y, left.width, left.height);
   const fitted = fitRect(frameCanvas.width, frameCanvas.height, left.width, left.height - 28);
@@ -653,7 +728,7 @@ function buildCombinedCapture(frameCanvas, chatCanvas, title, seconds) {
   ctx.fillStyle = '#000000';
   ctx.font = `11px ${CAPTURE_FONT_FAMILY}`;
   ctx.fillText(`stream98 capture  |  ${title}`, left.x + 6, 1024 - 14);
-  ctx.fillText(`timestamp ${formatTime(seconds)}  |  ${playback?.mediaId || ''}`, left.x + 500, 1024 - 14);
+  ctx.fillText(`timestamp ${formatTime(seconds)}  |  ${playback?.videoId || ''}`, left.x + 500, 1024 - 14);
 
   ctx.drawImage(chatCanvas, 1024, 0);
   return canvas;
@@ -666,14 +741,14 @@ function canvasToBlob(canvas) {
 }
 
 async function downloadStream98Capture() {
-  if (!playback?.mediaId) throw new Error(t('toastCaptureNeedVideo'));
+  if (!playback?.videoId) throw new Error(t('toastCaptureNeedVideo'));
   toast(t('toastCapturePreparing'));
   const frameCanvas = await captureVideoSurfaceCanvas();
-  const meta = await warmMediaMetadata(playback) || { title: playback.mediaId, mediaId: playback.mediaId };
+  const meta = await warmMediaMetadata(playback) || { title: playback.videoId, videoId: playback.videoId };
   const seconds = actualOrExpectedPosition();
   const chatCanvas = buildChatCaptureCanvas(messageHistory, roomId);
-  const combined = buildCombinedCapture(frameCanvas, chatCanvas, meta.title || playback.mediaId, seconds);
-  const filename = `stream98_${sanitizeFilenamePart(meta.title || playback.mediaId)}_${formatTimestampForFilename(seconds)}_${sanitizeFilenamePart(playback.mediaId, 'video')}.png`;
+  const combined = buildCombinedCapture(frameCanvas, chatCanvas, meta.title || playback.videoId, seconds);
+  const filename = `stream98_${sanitizeFilenamePart(meta.title || playback.videoId)}_${formatTimestampForFilename(seconds)}_${sanitizeFilenamePart(playback.videoId, 'video')}.png`;
   const blob = await canvasToBlob(combined);
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -691,15 +766,42 @@ function enableChat(enabled) {
   els.sendButton.disabled = !enabled;
 }
 
-async function measureClockOffset() {
-  if (!socket.connected || !joined) return;
-  const t0 = Date.now();
-  socket.emit('time:ping', { clientTime: t0 }, (payload) => {
-    const t1 = Date.now();
-    if (!payload?.serverTime) return;
-    const estimate = payload.serverTime - (t0 + t1) / 2;
-    serverOffsetMs = serverOffsetMs * 0.65 + estimate * 0.35;
+function sampleClockOffset() {
+  if (!socket.connected || !joined) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    const timeout = setTimeout(() => resolve(null), 1800);
+    socket.emit('time:ping', { clientTime: t0 }, (payload) => {
+      clearTimeout(timeout);
+      const t1 = Date.now();
+      if (!Number.isFinite(payload?.serverTime)) return resolve(null);
+      resolve({
+        offset: payload.serverTime - (t0 + t1) / 2,
+        rtt: t1 - t0,
+      });
+    });
   });
+}
+
+async function calibrateClockInitially() {
+  const samples = [];
+  for (let index = 0; index < 5 && joined; index += 1) {
+    const sample = await sampleClockOffset();
+    if (sample) samples.push(sample);
+  }
+  samples.sort((a, b) => a.rtt - b.rtt);
+  if (samples[0]) serverOffsetMs = samples[0].offset;
+}
+
+function scheduleClockCalibration() {
+  clearTimeout(clockCalibrationTimer);
+  if (!joined) return;
+  const delayMs = 15000 + Math.random() * 15000;
+  clockCalibrationTimer = setTimeout(async () => {
+    const sample = await sampleClockOffset();
+    if (sample) serverOffsetMs = serverOffsetMs * 0.8 + sample.offset * 0.2;
+    scheduleClockCalibration();
+  }, delayMs);
 }
 
 function toast(message) {
@@ -716,7 +818,9 @@ els.joinForm.addEventListener('submit', (event) => {
 
 els.copyInviteButton.addEventListener('click', async () => {
   try {
-    await navigator.clipboard.writeText(window.location.href);
+    const invite = new URL(window.location.href);
+    invite.hash = new URLSearchParams({ token: roomContext.guestToken || accessToken }).toString();
+    await navigator.clipboard.writeText(invite.href);
     toast(t('toastInviteCopied'));
   } catch {
     toast(t('toastCopyFailed'));
@@ -731,6 +835,34 @@ els.loadButton.addEventListener('click', () => {
     toast(error.message);
   }
 });
+
+els.retryPlayerButton.addEventListener('click', async () => {
+  if (!playback?.videoId) return;
+  hidePlayerError();
+  try {
+    await youtube.retry(playback, expectedPosition());
+  } catch (error) {
+    showPlayerError(error.message || t('toastSyncFailed'));
+  }
+});
+
+els.unmuteButton.addEventListener('click', () => {
+  youtube.unmute();
+  els.unmuteOverlay.classList.add('is-hidden');
+});
+
+function updateRoomPermissions() {
+  if (activeRole !== 'owner') return;
+  socket.emit('room:permissions:update', {
+    guestControl: els.guestControlInput.checked,
+    guestChat: els.guestChatInput.checked,
+  }, (response) => {
+    if (!response?.ok) toast(response?.error || t('toastPermissionsFailed'));
+  });
+}
+
+els.guestControlInput.addEventListener('change', updateRoomPermissions);
+els.guestChatInput.addEventListener('change', updateRoomPermissions);
 
 els.sourceInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') els.loadButton.click();
@@ -776,7 +908,7 @@ els.fullscreenButton.addEventListener('click', async () => {
 els.chatForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const body = els.chatInput.value.trim();
-  if (!body || !joined) return;
+  if (!body || !joined || !canSendChat()) return;
   socket.emit('chat:send', { body }, (response) => {
     if (!response?.ok) toast(response?.error || t('toastSendFailed'));
   });
@@ -812,20 +944,18 @@ updateTaskbarClock();
 setInterval(updateTaskbarClock, 1000);
 
 setInterval(() => {
-  if (!playback?.mediaId) return;
+  if (!playback?.videoId) return;
   const target = expectedPosition();
   let shown = target;
   let duration = 0;
 
-  if (playback.provider === 'youtube') {
-    const current = youtube.getCurrentTime();
-    if (current > 0 || target < 1) shown = current;
-    duration = youtube.getDuration();
-    if (!draggingSeek && duration > 0) {
-      els.seekRange.max = String(duration);
-      els.seekRange.value = String(Math.min(duration, shown));
-      els.durationTime.textContent = formatTime(duration);
-    }
+  const current = youtube.getCurrentTime();
+  if (current > 0 || target < 1) shown = current;
+  duration = youtube.getDuration();
+  if (!draggingSeek && duration > 0) {
+    els.seekRange.max = String(duration);
+    els.seekRange.value = String(Math.min(duration, shown));
+    els.durationTime.textContent = formatTime(duration);
   }
 
   if (!draggingSeek) els.currentTime.textContent = formatTime(shown);
@@ -833,11 +963,9 @@ setInterval(() => {
 }, 250);
 
 setInterval(() => {
-  if (playback?.provider !== 'youtube' || !playback.mediaId) return;
+  if (!playback?.videoId) return;
   youtube.correctDrift(expectedPosition(), playback.paused);
 }, 2000);
-
-setInterval(measureClockOffset, 15000);
 
 
 $('#joinDialogClose')?.addEventListener('click', () => {

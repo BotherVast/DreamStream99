@@ -4,8 +4,7 @@ const ALLOWED_RATES = new Set([0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]);
 export function createInitialPlayback() {
   return {
     revision: 0,
-    provider: null,
-    mediaId: null,
+    videoId: null,
     paused: true,
     anchorSeconds: 0,
     anchorServerMs: Date.now(),
@@ -16,7 +15,7 @@ export function createInitialPlayback() {
 }
 
 export function expectedPosition(state, nowMs = Date.now()) {
-  if (!state || state.paused || !state.mediaId) return state?.anchorSeconds ?? 0;
+  if (!state || state.paused || !state.videoId) return state?.anchorSeconds ?? 0;
   const elapsed = Math.max(0, nowMs - state.anchorServerMs) / 1000;
   return clampPosition(state.anchorSeconds + elapsed * state.playbackRate);
 }
@@ -37,18 +36,15 @@ export function applyPlaybackCommand(current, command, actor, nowMs = Date.now()
 
   const next = { ...current };
   const position = clampPosition(command.position ?? expectedPosition(current, nowMs));
-  const actionId = typeof command.actionId === 'string' ? command.actionId.slice(0, 80) : null;
+  if (!isValidActionId(command.actionId)) throw new Error('Invalid action id');
+  const actionId = command.actionId;
 
   switch (command.action) {
     case 'load': {
-      if (command.provider !== 'youtube') {
-        throw new Error('Unsupported provider');
+      if (!isValidVideoId(command.videoId)) {
+        throw new Error('Invalid video id');
       }
-      if (!isValidMediaId(command.mediaId)) {
-        throw new Error('Invalid media id');
-      }
-      next.provider = 'youtube';
-      next.mediaId = command.mediaId;
+      next.videoId = command.videoId;
       next.paused = true;
       next.anchorSeconds = clampPosition(command.position ?? 0);
       next.anchorServerMs = nowMs;
@@ -56,25 +52,31 @@ export function applyPlaybackCommand(current, command, actor, nowMs = Date.now()
       break;
     }
     case 'play':
-      requireMedia(next);
+      requireVideo(next);
       next.anchorSeconds = position;
       next.anchorServerMs = nowMs;
       next.paused = false;
       break;
     case 'pause':
-      requireMedia(next);
+      requireVideo(next);
+      next.anchorSeconds = position;
+      next.anchorServerMs = nowMs;
+      next.paused = true;
+      break;
+    case 'end':
+      requireVideo(next);
       next.anchorSeconds = position;
       next.anchorServerMs = nowMs;
       next.paused = true;
       break;
     case 'seek':
-      requireMedia(next);
+      requireVideo(next);
       next.anchorSeconds = position;
       next.anchorServerMs = nowMs;
       if (typeof command.paused === 'boolean') next.paused = command.paused;
       break;
     case 'rate':
-      requireMedia(next);
+      requireVideo(next);
       next.anchorSeconds = position;
       next.anchorServerMs = nowMs;
       next.playbackRate = sanitizeRate(command.rate);
@@ -104,10 +106,16 @@ export function normalizeChat(value) {
   return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim().slice(0, 1000);
 }
 
-function requireMedia(state) {
-  if (!state.mediaId || !state.provider) throw new Error('No media loaded');
+function requireVideo(state) {
+  if (!state.videoId) throw new Error('No video loaded');
 }
 
-function isValidMediaId(mediaId) {
-  return typeof mediaId === 'string' && /^[A-Za-z0-9_-]{11}$/.test(mediaId);
+function isValidVideoId(videoId) {
+  return typeof videoId === 'string' && /^[A-Za-z0-9_-]{11}$/.test(videoId);
+}
+
+function isValidActionId(actionId) {
+  return typeof actionId === 'string'
+    && actionId.length <= 80
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(actionId);
 }
