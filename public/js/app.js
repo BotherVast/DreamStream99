@@ -1,5 +1,4 @@
 import { YouTubeAdapter } from './youtube-adapter.js';
-import { BilibiliAdapter } from './bilibili-adapter.js';
 
 const $ = (selector) => document.querySelector(selector);
 const socket = window.io({ transports: ['websocket', 'polling'] });
@@ -9,7 +8,7 @@ if (!config?.copy || !config?.theme) {
   throw new Error('WT_CONFIG is missing. Check /public/config.js');
 }
 const copy = config.copy;
-const CAPTURE_FONT_FAMILY = config.theme?.fontFamily || '"WT MS Sans Pixel", "WT WQY Bitmap Song", sans-serif';
+const CAPTURE_FONT_FAMILY = config.theme?.fontFamily || 'Tahoma, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif';
 
 function t(key, values = {}) {
   const template = copy[key];
@@ -23,6 +22,7 @@ function applyConfiguredCopy() {
   document.documentElement.style.setProperty('--title', config.theme.titleBar);
   document.documentElement.style.setProperty('--title-active', config.theme.titleBarActive);
   if (config.theme.fontFamily) document.documentElement.style.setProperty('--ui-font', config.theme.fontFamily);
+  if (config.theme.displayFontFamily) document.documentElement.style.setProperty('--display-font', config.theme.displayFontFamily);
 
   for (const element of document.querySelectorAll('[data-copy]')) {
     element.textContent = t(element.dataset.copy);
@@ -86,10 +86,7 @@ const els = {
   emptyPlayer: $('#emptyPlayer'),
   youtubeSurface: $('#youtubeSurface'),
   youtubeHost: $('#youtubeHost'),
-  bilibiliFrame: $('#bilibiliFrame'),
   providerBadge: $('#providerBadge'),
-  bilibiliNotice: $('#bilibiliNotice'),
-  openBilibiliButton: $('#openBilibiliButton'),
   playButton: $('#playButton'),
   backButton: $('#backButton'),
   forwardButton: $('#forwardButton'),
@@ -99,9 +96,6 @@ const els = {
   rateSelect: $('#rateSelect'),
   fullscreenButton: $('#fullscreenButton'),
   playerStage: $('#playerStage'),
-  biliSeekRow: $('#biliSeekRow'),
-  biliSeekInput: $('#biliSeekInput'),
-  biliSeekButton: $('#biliSeekButton'),
   members: $('#members'),
   memberCount: $('#memberCount'),
   messages: $('#messages'),
@@ -145,7 +139,6 @@ const youtube = new YouTubeAdapter(els.youtubeHost, {
   onAutoplayBlocked: () => toast(t('toastAutoplayBlocked')),
   onError: (code) => toast(t('toastYoutubeError', { code })),
 });
-const bilibili = new BilibiliAdapter(els.bilibiliFrame);
 
 function getOrCreateRoomId() {
   const url = new URL(window.location.href);
@@ -245,37 +238,34 @@ async function applyPlaybackState(payload, force = false) {
   }
 
   const target = expectedPosition(incoming);
-  showProvider(incoming.provider);
+  if (incoming.provider !== 'youtube') {
+    showProvider(null);
+    toast(t('toastUnsupportedProvider'));
+    return;
+  }
+
+  showProvider('youtube');
   els.rateSelect.value = String(incoming.playbackRate || 1);
   updatePlayVisual(incoming.paused);
   warmMediaMetadata(incoming).catch(() => {});
 
   try {
-    if (incoming.provider === 'youtube') {
-      await youtube.apply(incoming, target);
-    } else if (incoming.provider === 'bilibili') {
-      bilibili.apply(incoming, target);
-    }
+    await youtube.apply(incoming, target);
   } catch (error) {
     toast(error.message || t('toastSyncFailed'));
   }
 }
 
 function showProvider(provider) {
-  const hasProvider = Boolean(provider);
+  const hasProvider = provider === 'youtube';
   els.emptyPlayer.classList.toggle('is-hidden', hasProvider);
-  els.youtubeSurface.classList.toggle('is-hidden', provider !== 'youtube');
-  els.bilibiliFrame.classList.toggle('is-hidden', provider !== 'bilibili');
+  els.youtubeSurface.classList.toggle('is-hidden', !hasProvider);
   els.providerBadge.classList.toggle('is-hidden', !hasProvider);
-  els.bilibiliNotice.classList.toggle('is-hidden', provider !== 'bilibili');
-  els.biliSeekRow.classList.toggle('is-hidden', provider !== 'bilibili');
 
-  if (provider === 'youtube') els.providerBadge.textContent = t('providerYouTube');
-  else if (provider === 'bilibili') els.providerBadge.textContent = t('providerBilibili');
+  if (hasProvider) els.providerBadge.textContent = t('providerYouTube');
 
-  els.rateSelect.disabled = !joined || !hasProvider || provider === 'bilibili';
-  els.seekRange.disabled = !joined || !hasProvider || provider === 'bilibili';
-  els.durationTime.textContent = provider === 'bilibili' ? '--:--' : els.durationTime.textContent;
+  els.rateSelect.disabled = !joined || !hasProvider;
+  els.seekRange.disabled = !joined || !hasProvider;
 }
 
 function updateControlsEnabled(enabled) {
@@ -283,8 +273,8 @@ function updateControlsEnabled(enabled) {
   els.playButton.disabled = disabled;
   els.backButton.disabled = disabled;
   els.forwardButton.disabled = disabled;
-  els.rateSelect.disabled = disabled || playback?.provider === 'bilibili';
-  els.seekRange.disabled = disabled || playback?.provider === 'bilibili';
+  els.rateSelect.disabled = disabled;
+  els.seekRange.disabled = disabled;
 }
 
 function expectedPosition(state = playback) {
@@ -296,10 +286,8 @@ function expectedPosition(state = playback) {
 }
 
 function actualOrExpectedPosition() {
-  if (playback?.provider === 'youtube') {
-    const current = youtube.getCurrentTime();
-    if (current > 0 || expectedPosition() < 1) return current;
-  }
+  const current = youtube.getCurrentTime();
+  if (current > 0 || expectedPosition() < 1) return current;
   return expectedPosition();
 }
 
@@ -325,12 +313,6 @@ function parseMediaInput(raw) {
   const value = raw.trim();
   if (!value) throw new Error(t('toastPasteLink'));
 
-  const youtubeIdDirect = value.match(/^[A-Za-z0-9_-]{11}$/)?.[0];
-  if (youtubeIdDirect) return { provider: 'youtube', mediaId: youtubeIdDirect, page: 1, position: 0 };
-
-  const bvDirect = value.match(/^BV[A-Za-z0-9]{8,20}$/)?.[0];
-  if (bvDirect) return { provider: 'bilibili', mediaId: bvDirect, page: 1, position: 0 };
-
   let url;
   try {
     url = new URL(value);
@@ -341,33 +323,25 @@ function parseMediaInput(raw) {
   const host = url.hostname.replace(/^www\./, '').toLowerCase();
   if (host === 'youtu.be') {
     const mediaId = url.pathname.split('/').filter(Boolean)[0];
-    if (!mediaId) throw new Error(t('toastYoutubeMissingId'));
-    return { provider: 'youtube', mediaId, page: 1, position: parseStartTime(url) };
+    if (!isYouTubeId(mediaId)) throw new Error(t('toastYoutubeMissingId'));
+    return { provider: 'youtube', mediaId, position: parseStartTime(url) };
   }
 
-  if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+  const isYouTubeHost = host === 'youtube.com' || host.endsWith('.youtube.com');
+  const isYouTubeNoCookieHost = host === 'youtube-nocookie.com' || host.endsWith('.youtube-nocookie.com');
+  if (isYouTubeHost || isYouTubeNoCookieHost) {
     const parts = url.pathname.split('/').filter(Boolean);
     let mediaId = url.searchParams.get('v');
     if (!mediaId && ['shorts', 'embed', 'live'].includes(parts[0])) mediaId = parts[1];
-    if (!mediaId) throw new Error(t('toastYoutubeMissingId'));
-    return { provider: 'youtube', mediaId, page: 1, position: parseStartTime(url) };
-  }
-
-  if (host.endsWith('bilibili.com') || host === 'b23.tv') {
-    const bv = value.match(/BV[A-Za-z0-9]{8,20}/)?.[0];
-    if (!bv) {
-      if (host === 'b23.tv') throw new Error(t('toastB23Expand'));
-      throw new Error(t('toastBilibiliMissingId'));
-    }
-    return {
-      provider: 'bilibili',
-      mediaId: bv,
-      page: Math.max(1, Number(url.searchParams.get('p') || 1) || 1),
-      position: parseStartTime(url),
-    };
+    if (!isYouTubeId(mediaId)) throw new Error(t('toastYoutubeMissingId'));
+    return { provider: 'youtube', mediaId, position: parseStartTime(url) };
   }
 
   throw new Error(t('toastUnsupportedProvider'));
+}
+
+function isYouTubeId(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{11}$/.test(value);
 }
 
 function parseStartTime(url) {
@@ -415,12 +389,6 @@ function renderMembers(members) {
     const name = document.createElement('span');
     name.textContent = member.nickname + (member.clientId === clientId ? t('youSuffix') : '');
     chip.append(avatar, name);
-    if (member.kind === 'bilibili-extension') {
-      const kind = document.createElement('span');
-      kind.className = 'member-kind';
-      kind.textContent = t('bilibiliExtension');
-      chip.append(kind);
-    }
     els.members.append(chip);
   }
 }
@@ -466,22 +434,11 @@ function appendMessage(message, shouldScroll) {
 
 
 async function warmMediaMetadata(state = playback) {
-  if (!state?.provider || !state?.mediaId) return null;
+  if (state?.provider !== 'youtube' || !state.mediaId) return null;
   const cacheKey = `${state.provider}:${state.mediaId}`;
   if (mediaMetadataCache.has(cacheKey)) return mediaMetadataCache.get(cacheKey);
 
-  let title = state.mediaId;
-  if (state.provider === 'youtube') {
-    title = youtube.getVideoTitle?.() || state.mediaId;
-  } else if (state.provider === 'bilibili') {
-    try {
-      const response = await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(state.mediaId)}`);
-      const payload = await response.json();
-      title = payload?.data?.title || state.mediaId;
-    } catch {
-      title = state.mediaId;
-    }
-  }
+  const title = youtube.getVideoTitle?.() || state.mediaId;
 
   const meta = { provider: state.provider, mediaId: state.mediaId, title };
   mediaMetadataCache.set(cacheKey, meta);
@@ -569,8 +526,8 @@ function fitRect(srcW, srcH, dstW, dstH) {
 }
 
 async function captureVideoSurfaceCanvas() {
-  const target = playback?.provider === 'youtube' ? els.youtubeSurface : els.bilibiliFrame;
-  if (!target || !playback?.mediaId) throw new Error(t('toastCaptureNeedVideo'));
+  const target = els.youtubeSurface;
+  if (playback?.provider !== 'youtube' || !playback.mediaId) throw new Error(t('toastCaptureNeedVideo'));
   if (!navigator.mediaDevices?.getDisplayMedia) throw new Error(t('toastCaptureFailed'));
 
   toast(t('toastCapturePickTab'));
@@ -814,19 +771,6 @@ els.fullscreenButton.addEventListener('click', async () => {
   } catch {
     toast(t('toastFullscreenFailed'));
   }
-});
-
-els.biliSeekButton.addEventListener('click', () => {
-  try {
-    const position = parseTimeValue(els.biliSeekInput.value);
-    sendPlayback('seek', { position });
-  } catch (error) {
-    toast(error.message);
-  }
-});
-
-els.openBilibiliButton.addEventListener('click', () => {
-  window.open(bilibili.externalUrl(expectedPosition()), '_blank', 'noopener,noreferrer');
 });
 
 els.chatForm.addEventListener('submit', (event) => {

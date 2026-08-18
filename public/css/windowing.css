@@ -6,7 +6,8 @@
 
 :root {
   --ui-scale: 1;
-  --ui-font: "WT MS Sans Pixel", "WT WQY Bitmap Song", sans-serif;
+  --ui-font: Tahoma, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif;
+  --display-font: "WT MS Sans Pixel", "WT WQY Bitmap Song", Tahoma, sans-serif;
 }
 
 html,
@@ -24,10 +25,10 @@ button,
 input,
 textarea,
 select {
-  font-size: 12px;
-  line-height: 1.15;
-  -webkit-font-smoothing: none;
-  text-rendering: optimizeSpeed;
+  font-size: 13px;
+  line-height: 1.25;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   font-synthesis: none;
 }
 
@@ -45,8 +46,6 @@ select {
 .media-control,
 .time-label,
 .source-row,
-.retro-notice,
-.bili-seek-row,
 .web-action,
 .old-web-footer,
 .chat-form textarea,
@@ -199,25 +198,26 @@ body {
 /* ---- direct pixel-font logos; no Canvas rasterization layer ---- */
 .media-brand {
   display: block;
-  font-family: var(--ui-font) !important;
+  font-family: var(--display-font) !important;
   font-size: 24px;
   line-height: 32px;
   font-weight: 700;
   letter-spacing: -1px;
 }
 .chat-brand {
-  font-family: var(--ui-font) !important;
+  font-family: var(--display-font) !important;
   font-size: 24px;
   line-height: 28px;
   font-weight: 700;
 }
 .chat-tagline {
-  font-family: var(--ui-font) !important;
+  font-family: var(--display-font) !important;
   font-size: 13px;
   line-height: 15px;
   font-weight: 700;
 }
 .now-watching {
+  font-family: var(--display-font) !important;
   font-size: 15px !important;
   line-height: 18px;
 }
@@ -254,23 +254,21 @@ body {
   background-size: auto !important;
 }
 
-/* ---- site typography sized around the 12px bitmap CJK master ---- */
+/* ---- readable UI typography; pixel faces are reserved for display text ---- */
 .web-box,
 .web-box h2,
 .login-box input,
 .login-box .tiny-button,
 .room-line,
 .source-row,
-.retro-notice,
-.bili-seek-row,
 .old-web-footer,
 .chat-site,
 .chat-action-row button,
 .chat-form textarea {
-  font-size: 12px !important;
+  font-size: 13px !important;
 }
-.message { font-size: 12px !important; line-height: 15px !important; }
-.message-time { font-size: 10px !important; }
+.message { font-size: 13px !important; line-height: 17px !important; }
+.message-time { font-size: 11px !important; }
 .media-tagline,
 .chat-site-footer,
 .smiley-strip a { font-size: 11px !important; }
@@ -343,8 +341,7 @@ body {
   transform-origin: right bottom;
 }
 
-/* Keep Chinese UI copy on the 12px WQY bitmap master rather than shrinking it
-   to 9/10/11px in a few old-web subcomponents. */
+/* Do not shrink functional UI copy below the readable base size. */
 .chat-site-nav,
 .member-chip,
 .presence-legend,
@@ -353,5 +350,5 @@ body {
 .compact-box li,
 .chat-site-footer,
 .smiley-strip a {
-  font-size: 12px !important;
+  font-size: 13px !important;
 }

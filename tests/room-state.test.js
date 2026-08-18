@@ -26,7 +26,6 @@ test('load initializes media and increments revision', () => {
     action: 'load',
     provider: 'youtube',
     mediaId: 'M7lc1UVf-VE',
-    page: 1,
     position: 12,
     actionId: 'a1',
   }, { nickname: 'Alice' }, 5000);
@@ -51,11 +50,21 @@ test('last accepted command gets a higher revision', () => {
 
 test('seek clamps negative positions and preserves pause state', () => {
   let state = applyPlaybackCommand(createInitialPlayback(), {
-    action: 'load', provider: 'bilibili', mediaId: 'BV1xx411c7mD'
+    action: 'load', provider: 'youtube', mediaId: 'M7lc1UVf-VE'
   }, { nickname: 'Alice' }, 1000);
   const next = applyPlaybackCommand(state, { action: 'seek', position: -200 }, { nickname: 'Bob' }, 2000);
   assert.equal(next.anchorSeconds, 0);
   assert.equal(next.paused, true);
+});
+
+test('load rejects non-YouTube providers and malformed video ids', () => {
+  assert.throws(() => applyPlaybackCommand(createInitialPlayback(), {
+    action: 'load', provider: 'other', mediaId: 'BV1xx411c7mD'
+  }, { nickname: 'Alice' }, 1000), /Unsupported provider/);
+
+  assert.throws(() => applyPlaybackCommand(createInitialPlayback(), {
+    action: 'load', provider: 'youtube', mediaId: 'too-short'
+  }, { nickname: 'Alice' }, 1000), /Invalid media id/);
 });
 
 test('nickname and chat inputs are bounded and stripped of controls', () => {

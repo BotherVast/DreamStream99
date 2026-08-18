@@ -9,23 +9,25 @@ window.WT_CONFIG = {
 
   /**
    * 字体
-   * - 英文：98.css 的 Pixelated MS Sans Serif
-   * - 中文：文泉驿点阵宋体 12px
+   * - UI / 正文：优先使用系统字体，保证 1× 缩放时中英文清晰可读
+   * - Logo / 大标题：使用 98.css 的 Pixelated MS Sans Serif
+   * - 文泉驿点阵宋体保留为复古展示字体的中文回退
    *
-   * 字体通过 CDN 加载，项目内不需要放字体文件。
+   * 字体默认从项目内加载，避免 CDN 不可用时退回系统字体并破坏布局。
    * 如以后有自己合法可用的网页字体，只改下面 URL 即可。
    */
   fonts: {
-    latinRegularUrl: 'https://cdn.jsdelivr.net/gh/jdan/98.css@main/fonts/converted/ms_sans_serif.woff',
-    latinBoldUrl: 'https://cdn.jsdelivr.net/gh/jdan/98.css@main/fonts/converted/ms_sans_serif_bold.woff',
-    cjkUrl: 'https://cdn.jsdelivr.net/gh/AmusementClub/WenQuanYi-Bitmap-Song-TTF@master/WenQuanYi%20Bitmap%20Song%2012px.ttf',
+    latinRegularUrl: '/assets/fonts/ms_sans_serif.woff',
+    latinBoldUrl: '/assets/fonts/ms_sans_serif_bold.woff',
+    cjkUrl: '/assets/fonts/WenQuanYi-Bitmap-Song-12px.ttf',
   },
 
   theme: {
     desktop: '#008080',
     titleBar: '#000080',
     titleBarActive: '#000080',
-    fontFamily: '"WT MS Sans Pixel", "WT WQY Bitmap Song", sans-serif',
+    fontFamily: 'Tahoma, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif',
+    displayFontFamily: '"WT MS Sans Pixel", "WT WQY Bitmap Song", Tahoma, sans-serif',
   },
 
   /**
@@ -178,15 +180,10 @@ window.WT_CONFIG = {
     watchingNow: '人正在房间中',
     copyInvite: '邀请朋友!',
     sourceLabel: '视频地址:',
-    sourcePlaceholder: 'YouTube / Bilibili 链接',
+    sourcePlaceholder: 'YouTube 视频地址',
     loadVideo: '打开',
     emptyTitle: 'NO VIDEO LOADED',
     emptyText: 'Paste a video URL below.',
-    bilibiliNotice: 'B站网页模式为基础同步；完整控制请使用扩展。',
-    openBilibili: '在 B站打开',
-    absoluteSeek: '跳转到',
-    absoluteSeekPlaceholder: '12:34 或 754',
-    seek: '跳转',
     featuredDownload: 'FEATURED DOWNLOAD',
     featuredName: 'PixelStream Player 2.0',
     featuredCopy: 'Faster. Better. Totally Rad.',
@@ -215,7 +212,6 @@ window.WT_CONFIG = {
     send: '发送',
     chatEmpty: '*** 房间里还没有消息 ***',
     youSuffix: '（你）',
-    bilibiliExtension: 'B站扩展',
     onlineLegend: '在线',
     awayLegend: '离开',
     busyLegend: '忙碌',
@@ -236,7 +232,6 @@ window.WT_CONFIG = {
     statusOnline: '已连接',
     statusReconnecting: '重拨中…',
     providerYouTube: 'YouTube',
-    providerBilibili: 'Bilibili',
 
     ariaPlay: '播放',
     ariaPause: '暂停',
@@ -253,9 +248,7 @@ window.WT_CONFIG = {
     toastPasteLink: '请粘贴视频链接。',
     toastInvalidLink: '无法识别这个链接。',
     toastYoutubeMissingId: 'YouTube 链接缺少视频 ID。',
-    toastB23Expand: '请先展开 b23.tv 短链接。',
-    toastBilibiliMissingId: '没有找到 BV 号。',
-    toastUnsupportedProvider: '仅支持 YouTube 和 Bilibili。',
+    toastUnsupportedProvider: '仅支持 YouTube 视频地址。',
     toastInvalidTime: '无法识别时间。',
     toastInviteCopied: '邀请链接已复制。',
     toastCopyFailed: '复制失败。',

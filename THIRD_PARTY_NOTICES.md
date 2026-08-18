@@ -1,13 +1,13 @@
 # Third-party notices / 素材来源
 
-这个项目是个人复古网页实验。以下资源只用于界面还原或作为外部运行时资源。
+这个项目是个人复古网页实验。以下资源只用于界面还原或作为运行时资源。
 
 ## 98.css / Pixelated MS Sans Serif
 
 - Project: `jdan/98.css`
 - Repository: https://github.com/jdan/98.css
 - License: MIT（仓库许可）
-- 本项目通过 `public/config.js` 的外部 URL 加载该仓库中的 WOFF；ZIP 不包含字体文件。
+- 本项目在 `public/assets/fonts/` 中包含该仓库的常规和粗体 WOFF，取自 commit `b1d7a907371bbe523d6f64e3af97f714fdbd6d6a`，并通过 `public/config.js` 从本地加载。
 
 ## 文泉驿点阵宋体 TTF
 
@@ -15,7 +15,7 @@
 - Repository: https://github.com/AmusementClub/WenQuanYi-Bitmap-Song-TTF
 - 上游：文泉驿点阵宋体
 - License: GNU GPL v2 + 文档嵌入例外（以项目/上游 README 为准）
-- 本项目默认指向 12×12 / `WenQuanYi Bitmap Song 12px` 的外部 CDN URL；ZIP 不包含字体文件。
+- 本项目在 `public/assets/fonts/` 中包含 12×12 / `WenQuanYi Bitmap Song 12px` TTF，取自 commit `7724da71817090ba92e76d9d40e3dd43afef25de`，并通过 `public/config.js` 从本地加载。
 
 ## Windows 98 system icons
 

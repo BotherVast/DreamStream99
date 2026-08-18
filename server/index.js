@@ -4,7 +4,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { Server as SocketIOServer } from 'socket.io';
-import { WebSocketServer, WebSocket } from 'ws';
 import {
   applyPlaybackCommand,
   createInitialPlayback,
@@ -32,14 +31,6 @@ const io = new SocketIOServer(server, {
   maxHttpBufferSize: 1e6,
 });
 
-const wss = new WebSocketServer({ noServer: true });
-server.on('upgrade', (request, socket, head) => {
-  const pathname = new URL(request.url || '/', 'http://localhost').pathname;
-  if (pathname !== '/bridge') return;
-  wss.handleUpgrade(request, socket, head, (ws) => {
-    wss.emit('connection', ws, request);
-  });
-});
 const rooms = new Map();
 
 function getRoom(roomId) {
@@ -50,7 +41,6 @@ function getRoom(roomId) {
       playback: createInitialPlayback(),
       clients: new Map(),
       messages: [],
-      extensionSockets: new Set(),
       lastActive: Date.now(),
     };
     rooms.set(roomId, room);
@@ -60,10 +50,9 @@ function getRoom(roomId) {
 }
 
 function publicMembers(room) {
-  return [...room.clients.values()].map(({ clientId, nickname, kind }) => ({
+  return [...room.clients.values()].map(({ clientId, nickname }) => ({
     clientId,
     nickname,
-    kind,
   }));
 }
 
@@ -77,32 +66,18 @@ function snapshot(room) {
   };
 }
 
-function safeSend(ws, payload) {
-  if (ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify(payload));
-}
-
-function broadcastRaw(room, payload, except = null) {
-  for (const ws of room.extensionSockets) {
-    if (ws !== except) safeSend(ws, payload);
-  }
-}
-
 function broadcastPresence(room) {
   const members = publicMembers(room);
   io.to(room.id).emit('presence:update', members);
-  broadcastRaw(room, { type: 'presence', members });
 }
 
 function broadcastPlayback(room) {
   const payload = { playback: room.playback, serverTime: Date.now() };
   io.to(room.id).emit('playback:state', payload);
-  broadcastRaw(room, { type: 'playback', ...payload });
 }
 
 function broadcastChat(room, message) {
   io.to(room.id).emit('chat:message', message);
-  broadcastRaw(room, { type: 'chat', message });
 }
 
 function addChat(room, actor, body) {
@@ -127,11 +102,10 @@ function applyCommand(room, actor, command) {
   broadcastPlayback(room);
 }
 
-function leaveClient(roomId, clientId, socketRef = null) {
+function leaveClient(roomId, clientId) {
   const room = rooms.get(roomId);
   if (!room) return;
   room.clients.delete(clientId);
-  if (socketRef) room.extensionSockets.delete(socketRef);
   room.lastActive = Date.now();
   broadcastPresence(room);
 }
@@ -148,7 +122,6 @@ io.on('connection', (socket) => {
       const actor = {
         clientId: crypto.randomUUID(),
         nickname: normalizeNickname(payload?.nickname),
-        kind: 'web',
       };
       session = { roomId, actor };
       socket.join(roomId);
@@ -193,53 +166,6 @@ io.on('connection', (socket) => {
   });
 });
 
-wss.on('connection', (ws) => {
-  let session = null;
-
-  ws.on('message', (buffer) => {
-    try {
-      if (buffer.length > 64 * 1024) throw new Error('Message too large');
-      const payload = JSON.parse(buffer.toString('utf8'));
-
-      if (payload.type === 'join') {
-        const roomId = String(payload.roomId || '').toUpperCase();
-        if (!isValidRoomId(roomId)) throw new Error('Invalid room id');
-        if (session) leaveClient(session.roomId, session.actor.clientId, ws);
-
-        const room = getRoom(roomId);
-        const actor = {
-          clientId: crypto.randomUUID(),
-          nickname: normalizeNickname(payload.nickname),
-          kind: 'bilibili-extension',
-        };
-        session = { roomId, actor };
-        room.clients.set(actor.clientId, actor);
-        room.extensionSockets.add(ws);
-        safeSend(ws, { type: 'joined', clientId: actor.clientId, snapshot: snapshot(room) });
-        broadcastPresence(room);
-        return;
-      }
-
-      if (!session) throw new Error('Join first');
-      const room = rooms.get(session.roomId);
-      if (!room) throw new Error('Room expired');
-
-      if (payload.type === 'command') {
-        applyCommand(room, session.actor, payload.command || {});
-      } else if (payload.type === 'chat') {
-        const message = addChat(room, session.actor, payload.body);
-        if (message) broadcastChat(room, message);
-      }
-    } catch (error) {
-      safeSend(ws, { type: 'error', error: error.message });
-    }
-  });
-
-  ws.on('close', () => {
-    if (session) leaveClient(session.roomId, session.actor.clientId, ws);
-  });
-});
-
 setInterval(() => {
   const cutoff = Date.now() - 60 * 60 * 1000;
   for (const [roomId, room] of rooms) {
@@ -249,5 +175,4 @@ setInterval(() => {
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`Watch Together running at http://localhost:${port}`);
-  console.log(`Bilibili extension bridge: ws://localhost:${port}/bridge`);
 });

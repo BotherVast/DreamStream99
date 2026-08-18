@@ -121,7 +121,6 @@
                       <span data-copy="emptyText">Paste a video URL below.</span>
                     </div>
                     <div id="youtubeSurface" class="player-surface is-hidden"><div id="youtubeHost" class="youtube-host"></div></div>
-                    <iframe id="bilibiliFrame" class="player-surface is-hidden bili-frame" title="Bilibili player" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
                     <div id="providerBadge" class="provider-badge is-hidden"></div>
                   </div>
                 </div>
@@ -143,18 +142,8 @@
 
                 <div class="source-row">
                   <label for="sourceInput" data-copy="sourceLabel">视频地址:</label>
-                  <input id="sourceInput" type="url" inputmode="url" autocomplete="off" data-placeholder="sourcePlaceholder" placeholder="YouTube / Bilibili 链接" />
+                  <input id="sourceInput" type="url" inputmode="url" autocomplete="off" data-placeholder="sourcePlaceholder" placeholder="YouTube 视频地址" />
                   <button id="loadButton" class="default-button" type="button" data-copy="loadVideo">打开</button>
-                </div>
-
-                <div id="bilibiliNotice" class="retro-notice is-hidden">
-                  <img src="/assets/retro/star.png" alt="" /><span data-copy="bilibiliNotice">B站网页模式为基础同步。</span>
-                  <button id="openBilibiliButton" type="button" data-copy="openBilibili">在 B站打开</button>
-                </div>
-                <div class="bili-seek-row is-hidden" id="biliSeekRow">
-                  <label for="biliSeekInput" data-copy="absoluteSeek">跳转到</label>
-                  <input id="biliSeekInput" type="text" inputmode="numeric" data-placeholder="absoluteSeekPlaceholder" placeholder="12:34 或 754" />
-                  <button id="biliSeekButton" type="button" data-copy="seek">跳转</button>
                 </div>
 
                 <div class="room-actions">

@@ -6,7 +6,6 @@ export function createInitialPlayback() {
     revision: 0,
     provider: null,
     mediaId: null,
-    page: 1,
     paused: true,
     anchorSeconds: 0,
     anchorServerMs: Date.now(),
@@ -42,15 +41,14 @@ export function applyPlaybackCommand(current, command, actor, nowMs = Date.now()
 
   switch (command.action) {
     case 'load': {
-      if (!['youtube', 'bilibili'].includes(command.provider)) {
+      if (command.provider !== 'youtube') {
         throw new Error('Unsupported provider');
       }
-      if (!isValidMediaId(command.provider, command.mediaId)) {
+      if (!isValidMediaId(command.mediaId)) {
         throw new Error('Invalid media id');
       }
-      next.provider = command.provider;
+      next.provider = 'youtube';
       next.mediaId = command.mediaId;
-      next.page = normalizePage(command.page);
       next.paused = true;
       next.anchorSeconds = clampPosition(command.position ?? 0);
       next.anchorServerMs = nowMs;
@@ -106,18 +104,10 @@ export function normalizeChat(value) {
   return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim().slice(0, 1000);
 }
 
-export function normalizePage(value) {
-  const page = Math.floor(Number(value));
-  return Number.isFinite(page) ? Math.min(9999, Math.max(1, page)) : 1;
-}
-
 function requireMedia(state) {
   if (!state.mediaId || !state.provider) throw new Error('No media loaded');
 }
 
-function isValidMediaId(provider, mediaId) {
-  if (typeof mediaId !== 'string') return false;
-  if (provider === 'youtube') return /^[A-Za-z0-9_-]{6,20}$/.test(mediaId);
-  if (provider === 'bilibili') return /^BV[A-Za-z0-9]{8,20}$/.test(mediaId);
-  return false;
+function isValidMediaId(mediaId) {
+  return typeof mediaId === 'string' && /^[A-Za-z0-9_-]{11}$/.test(mediaId);
 }
