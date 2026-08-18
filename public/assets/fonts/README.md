@@ -12,10 +12,4 @@ unreachable.
   - License: GNU GPL v2 with the upstream document embedding exception; see
     `LICENSE-WENQUANYI.txt`
 
-`方正像素12` is supported as an optional locally installed font through its
-family and PostScript names (`方正像素12`, `FZXS12--GB1-0`, and `FZXS12`). It is
-not bundled because its use and Web embedding require separate authorization.
-The bundled WenQuanYi font remains the CJK fallback so missing glyphs do not
-turn into boxes or mojibake.
-
 See `/THIRD_PARTY_NOTICES.md` for project links and attribution.

@@ -9,14 +9,14 @@ if (!config?.copy || !config?.theme) {
 }
 const copy = config.copy;
 const runtime = {
-  mode: 'socketio',
+  mode: 'demo',
   websocketUrl: null,
   apiUrl: null,
   ...(window.WT_RUNTIME || {}),
 };
 const isDemoMode = runtime.mode === 'demo';
 const roomClient = createRoomClient(runtime);
-const CAPTURE_FONT_FAMILY = config.theme?.fontFamily || '"Pixelated MS Sans Serif", "FZ Pixel 12", "WenQuanYi Bitmap Song 12px", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif';
+const CAPTURE_FONT_FAMILY = config.theme?.fontFamily || '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif';
 
 function t(key, values = {}) {
   const template = copy[key];
@@ -313,7 +313,6 @@ async function applyPlaybackState(payload, force = false) {
   const target = expectedPosition(incoming);
   showVideo(true);
   hidePlayerError();
-  if (incoming.paused) els.unmuteOverlay.classList.add('is-hidden');
   els.rateSelect.value = String(incoming.playbackRate || 1);
   updatePlayVisual(incoming.paused);
   warmMediaMetadata(incoming).catch(() => {});
@@ -1013,7 +1012,6 @@ $('#joinDialogClose')?.addEventListener('click', () => {
   if (els.joinDialog.open) els.joinDialog.close();
 });
 
-updateCapabilities();
 if (isDemoMode) {
   els.copyInviteButton.textContent = t('demoModeButton');
   els.copyInviteButton.title = t('toastDemoMode');

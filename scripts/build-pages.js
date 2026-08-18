@@ -16,8 +16,7 @@ const html = (await readFile(htmlPath, 'utf8'))
   .replaceAll("='/", "='./");
 await writeFile(htmlPath, html);
 
-const configFiles = ['config.js', 'assets-config.js'];
-for (const filename of configFiles) {
+for (const filename of ['config.js', 'assets-config.js']) {
   const target = path.join(output, filename);
   const contents = (await readFile(target, 'utf8'))
     .replaceAll("'/assets/", "'./assets/")
@@ -25,8 +24,6 @@ for (const filename of configFiles) {
   await writeFile(target, contents);
 }
 
-// The deploy artifact is always the backend-free Pages demo, even when the
-// source tree is served by the retained local Socket.IO prototype.
 const runtimePath = path.join(output, 'runtime-config.js');
 await writeFile(runtimePath, `${await readFile(runtimePath, 'utf8')}
 window.WT_RUNTIME.mode = 'demo';
