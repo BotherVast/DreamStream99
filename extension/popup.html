@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Watch Together</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <main class="window-shell">
+    <div class="title-bar">
+      <div class="title-text"><img src="assets/link-world.png" alt="" />Watch Together</div>
+      <button class="caption-button" tabindex="-1" aria-hidden="true" type="button"></button>
+    </div>
+    <div class="menu-bar"><span>连接</span><span>帮助</span></div>
+
+    <div class="body">
+      <label class="toggle-row">
+        <span>启用同步</span>
+        <input id="enabled" type="checkbox" />
+      </label>
+
+      <div class="field">
+        <label for="serverUrl">服务器</label>
+        <input id="serverUrl" type="url" placeholder="http://localhost:3000" />
+      </div>
+      <div class="field">
+        <label for="roomId">房间号</label>
+        <input id="roomId" maxlength="12" placeholder="ABC123" />
+      </div>
+      <div class="field">
+        <label for="nickname">昵称</label>
+        <input id="nickname" maxlength="24" placeholder="昵称" />
+      </div>
+
+      <button id="save" class="default-button" type="button">保存并连接</button>
+
+      <div class="status-row">
+        <img src="assets/computer.png" alt="" />
+        <div id="status" class="status">未连接</div>
+      </div>
+    </div>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

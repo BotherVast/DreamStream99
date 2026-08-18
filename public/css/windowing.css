@@ -1,0 +1,357 @@
+/* ============================================================
+   High-DPI / pixel-font / real desktop-window layer
+   Loaded after app.css so this file intentionally overrides the
+   earlier static two-column layout.
+   ============================================================ */
+
+:root {
+  --ui-scale: 1;
+  --ui-font: "WT MS Sans Pixel", "WT WQY Bitmap Song", sans-serif;
+}
+
+html,
+body,
+button,
+input,
+textarea,
+select,
+option {
+  font-family: var(--ui-font) !important;
+}
+
+body,
+button,
+input,
+textarea,
+select {
+  font-size: 12px;
+  line-height: 1.15;
+  -webkit-font-smoothing: none;
+  text-rendering: optimizeSpeed;
+  font-synthesis: none;
+}
+
+/* Old-site content should use the same deliberately-designed pixel fonts.
+   This removes Arial/SimSun/Courier fallbacks that caused mixed rendering. */
+.media-site,
+.chat-site,
+.web-box,
+.web-box h2,
+.login-box input,
+.login-box button,
+.now-watching,
+.room-line,
+.provider-badge,
+.media-control,
+.time-label,
+.source-row,
+.retro-notice,
+.bili-seek-row,
+.web-action,
+.old-web-footer,
+.chat-form textarea,
+.chat-action-row button,
+.messages,
+.message,
+.message-time,
+.chat-site-footer,
+.empty-player,
+.visitor-counter b,
+.stats-box dd {
+  font-family: var(--ui-font) !important;
+}
+
+/* ---- integer-scaled virtual desktop ---- */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden !important;
+  background: var(--desktop);
+}
+
+.desktop {
+  position: absolute !important;
+  inset: 0 auto auto 0;
+  overflow: hidden !important;
+  background-color: var(--desktop);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  will-change: transform;
+}
+
+.desktop.has-custom-background {
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
+.desktop-workspace {
+  position: absolute !important;
+  z-index: 5;
+  inset: 0 0 29px 0 !important;
+  display: block !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  pointer-events: none;
+}
+
+.desktop-window {
+  position: absolute !important;
+  display: flex !important;
+  flex-direction: column;
+  min-width: 0 !important;
+  margin: 0 !important;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.desktop-window[hidden] {
+  display: none !important;
+}
+
+.desktop-window .browser-page,
+.desktop-window .player-stage,
+.desktop-window input,
+.desktop-window textarea,
+.desktop-window select,
+.desktop-window button,
+.desktop-window a {
+  touch-action: auto;
+}
+
+.desktop-window.window-active .title-bar {
+  background: linear-gradient(90deg, var(--title), var(--title-active));
+}
+
+.desktop-window .title-bar.inactive {
+  background: #808080 !important;
+  color: #c0c0c0;
+}
+
+.desktop-window .title-bar {
+  cursor: default;
+  touch-action: none;
+}
+
+.window-operation,
+.window-operation * {
+  cursor: inherit;
+}
+.window-operation iframe {
+  pointer-events: none !important;
+}
+
+/* ---- resize hit areas: invisible but behave like a real desktop window ---- */
+.window-resize-handle {
+  position: absolute;
+  z-index: 50;
+  display: block;
+  background: transparent;
+  touch-action: none;
+}
+.resize-n { left: 5px; right: 5px; top: -2px; height: 5px; cursor: n-resize; }
+.resize-s { left: 5px; right: 5px; bottom: -2px; height: 5px; cursor: s-resize; }
+.resize-e { top: 5px; bottom: 5px; right: -2px; width: 5px; cursor: e-resize; }
+.resize-w { top: 5px; bottom: 5px; left: -2px; width: 5px; cursor: w-resize; }
+.resize-ne { right: -2px; top: -2px; width: 8px; height: 8px; cursor: ne-resize; }
+.resize-nw { left: -2px; top: -2px; width: 8px; height: 8px; cursor: nw-resize; }
+.resize-se { right: -2px; bottom: -2px; width: 8px; height: 8px; cursor: se-resize; }
+.resize-sw { left: -2px; bottom: -2px; width: 8px; height: 8px; cursor: sw-resize; }
+.desktop-window.is-maximized .window-resize-handle { display: none; }
+
+/* ---- authentic-size IE toolbar crops ---- */
+.browser-toolbar {
+  flex-basis: 51px;
+}
+.browser-tool {
+  width: 54px;
+  min-width: 48px;
+  line-height: 12px;
+}
+.browser-tool img {
+  width: 24px !important;
+  height: 24px !important;
+  object-fit: none !important;
+  image-rendering: pixelated;
+}
+.compact-toolbar .browser-tool {
+  width: 50px;
+  min-width: 44px;
+}
+
+/* ---- replace Unicode/emoji site navigation with 16px image assets ---- */
+.icon-link-list li {
+  grid-template-columns: 16px 1fr !important;
+  min-height: 16px;
+  align-items: center;
+}
+.icon-link-list li > img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+/* ---- direct pixel-font logos; no Canvas rasterization layer ---- */
+.media-brand {
+  display: block;
+  font-family: var(--ui-font) !important;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+.chat-brand {
+  font-family: var(--ui-font) !important;
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 700;
+}
+.chat-tagline {
+  font-family: var(--ui-font) !important;
+  font-size: 13px;
+  line-height: 15px;
+  font-weight: 700;
+}
+.now-watching {
+  font-size: 15px !important;
+  line-height: 18px;
+}
+
+/* ---- replaceable art slots ---- */
+.custom-site-logo {
+  position: relative;
+  z-index: 5;
+  display: block;
+  max-width: calc(100% - 18px);
+  max-height: 78px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.custom-site-logo[hidden] { display: none !important; }
+.media-site-header.has-custom-logo .brand-art,
+.media-site-header.has-custom-logo .media-brand-wrap {
+  display: none;
+}
+.chat-site-header.has-custom-logo .chat-logo-icons,
+.chat-site-header.has-custom-logo > div:not(.chat-logo-icons) {
+  display: none;
+}
+.media-site-header.has-custom-background,
+.chat-site-header.has-custom-background {
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+}
+.media-site.has-custom-background,
+.chat-site.has-custom-background {
+  background-repeat: repeat !important;
+  background-position: 0 0 !important;
+  background-size: auto !important;
+}
+
+/* ---- site typography sized around the 12px bitmap CJK master ---- */
+.web-box,
+.web-box h2,
+.login-box input,
+.login-box .tiny-button,
+.room-line,
+.source-row,
+.retro-notice,
+.bili-seek-row,
+.old-web-footer,
+.chat-site,
+.chat-action-row button,
+.chat-form textarea {
+  font-size: 12px !important;
+}
+.message { font-size: 12px !important; line-height: 15px !important; }
+.message-time { font-size: 10px !important; }
+.media-tagline,
+.chat-site-footer,
+.smiley-strip a { font-size: 11px !important; }
+
+/* ---- taskbar is now interactive ---- */
+.taskbar {
+  z-index: 10000;
+}
+.task-button,
+.start-button {
+  cursor: default;
+}
+.task-button[hidden] { display: none !important; }
+
+/* The real window manager is desktop-only; prevent the older mobile grid rules
+   from unexpectedly taking over when browser devtools or DPI scaling changes. */
+@media (max-width: 820px) {
+  body { overflow: hidden !important; }
+  .desktop {
+    height: auto;
+    min-height: 0;
+    padding-bottom: 0;
+    overflow: hidden !important;
+  }
+  .desktop-icons { display: block; }
+  .desktop-workspace {
+    position: absolute !important;
+    inset: 0 0 29px 0 !important;
+    display: block !important;
+    padding: 0 !important;
+  }
+  .browser-window {
+    height: auto;
+    min-height: 0;
+  }
+  .browser-page {
+    max-height: none;
+    overflow: auto;
+  }
+  .taskbar { position: absolute; }
+}
+.desktop-window.is-maximized .caption-button.maximize::before {
+  left: 3px;
+  top: 4px;
+  width: 7px;
+  height: 6px;
+  border: 1px solid #000;
+  border-top-width: 2px;
+  background: #c0c0c0;
+  z-index: 2;
+}
+.desktop-window.is-maximized .caption-button.maximize::after {
+  left: 5px;
+  top: 2px;
+  width: 7px;
+  height: 6px;
+  border: 1px solid #000;
+  border-top-width: 2px;
+  background: #c0c0c0;
+  z-index: 1;
+}
+
+/* HiDPI layers that live outside .desktop need the same integer UI scale. */
+.join-dialog[open] {
+  transform: scale(var(--ui-scale));
+  transform-origin: center center;
+}
+.win98-toast {
+  transform: scale(var(--ui-scale));
+  transform-origin: right bottom;
+}
+
+/* Keep Chinese UI copy on the 12px WQY bitmap master rather than shrinking it
+   to 9/10/11px in a few old-web subcomponents. */
+.chat-site-nav,
+.member-chip,
+.presence-legend,
+.chat-welcome,
+.compact-box p,
+.compact-box li,
+.chat-site-footer,
+.smiley-strip a {
+  font-size: 12px !important;
+}
