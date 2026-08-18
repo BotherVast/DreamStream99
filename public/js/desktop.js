@@ -49,6 +49,22 @@ function installConfiguredFonts() {
   const style = document.createElement('style');
   style.id = 'wt-configured-fonts';
   style.textContent = `
+    ${fonts.preferredCjkUrl ? `
+    @font-face {
+      font-family: "FZ Pixel 12";
+      src: url("${q(fonts.preferredCjkUrl)}");
+      font-weight: 400;
+      font-style: normal;
+      font-display: block;
+    }
+    @font-face {
+      font-family: "FZ Pixel 12";
+      src: url("${q(fonts.preferredCjkUrl)}");
+      font-weight: 700;
+      font-style: normal;
+      font-display: block;
+    }
+    ` : ''}
     @font-face {
       font-family: "Pixelated MS Sans Serif";
       src: url("${q(fonts.latinRegularUrl)}") format("woff");

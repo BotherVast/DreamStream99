@@ -10,15 +10,17 @@ window.WT_CONFIG = {
   /**
    * 字体
    * - 英文 / 拉丁字符：98.css 的 Pixelated MS Sans Serif
-   * - 中文：文泉驿点阵宋体 12px
-   * - UI、正文和标题统一使用本地点阵字体栈
+   * - 中文：优先使用本机已授权的方正像素12，缺字或未安装时回退到文泉驿点阵宋体 12px
+   * - UI、正文和标题统一使用 12px 点阵字体栈
    *
    * 字体默认从项目内加载，避免 CDN 不可用时退回系统字体并破坏布局。
-   * 如以后有自己合法可用的网页字体，只改下面 URL 即可。
+   * 如需更换字体，请同步修改下面 URL 与 /css/fonts.css 中的字体声明。
    */
   fonts: {
     latinRegularUrl: '/assets/fonts/ms_sans_serif.woff',
     latinBoldUrl: '/assets/fonts/ms_sans_serif_bold.woff',
+    // 取得 Web 嵌入授权后可填写方正像素12文件路径；留空时只尝试本机已安装字体。
+    preferredCjkUrl: '',
     cjkUrl: '/assets/fonts/WenQuanYi-Bitmap-Song-12px.ttf',
   },
 
@@ -26,8 +28,8 @@ window.WT_CONFIG = {
     desktop: '#008080',
     titleBar: '#000080',
     titleBarActive: '#000080',
-    fontFamily: '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif',
-    displayFontFamily: '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif',
+    fontFamily: '"Pixelated MS Sans Serif", "FZ Pixel 12", "WenQuanYi Bitmap Song 12px", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif',
+    displayFontFamily: '"Pixelated MS Sans Serif", "FZ Pixel 12", "WenQuanYi Bitmap Song 12px", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif',
   },
 
   /**
@@ -230,6 +232,7 @@ window.WT_CONFIG = {
     statusJoining: '正在连接…',
     statusJoinFailed: '连接失败',
     statusOnline: '已连接',
+    statusDemo: '演示模式',
     statusReconnecting: '重拨中…',
     youtubeLabel: 'YouTube',
     roleOwner: '房主',
@@ -271,5 +274,7 @@ window.WT_CONFIG = {
     toastCaptureFailed: '截图失败。请确认选择的是当前标签页。',
     toastFullscreenFailed: '无法进入全屏。',
     toastSendFailed: '发送失败。',
+    demoModeButton: '演示模式',
+    toastDemoMode: '当前为 GitHub Pages 演示模式：播放和聊天只保存在本页。',
   },
 };

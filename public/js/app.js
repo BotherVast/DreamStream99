@@ -1,14 +1,22 @@
 import { YouTubeAdapter } from './youtube-adapter.js';
+import { createRoomClient } from './room-client.js';
 
 const $ = (selector) => document.querySelector(selector);
-const socket = window.io({ transports: ['websocket', 'polling'] });
 
 const config = window.WT_CONFIG;
 if (!config?.copy || !config?.theme) {
   throw new Error('WT_CONFIG is missing. Check /public/config.js');
 }
 const copy = config.copy;
-const CAPTURE_FONT_FAMILY = config.theme?.fontFamily || '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif';
+const runtime = {
+  mode: 'socketio',
+  websocketUrl: null,
+  apiUrl: null,
+  ...(window.WT_RUNTIME || {}),
+};
+const isDemoMode = runtime.mode === 'demo';
+const roomClient = createRoomClient(runtime);
+const CAPTURE_FONT_FAMILY = config.theme?.fontFamily || '"Pixelated MS Sans Serif", "FZ Pixel 12", "WenQuanYi Bitmap Song 12px", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif';
 
 function t(key, values = {}) {
   const template = copy[key];
@@ -173,11 +181,19 @@ async function getOrCreateRoomContext() {
   const roomId = (url.searchParams.get('room') || '').toUpperCase();
   const fragment = new URLSearchParams(url.hash.slice(1));
   const token = fragment.get('token');
+  if (isDemoMode) {
+    return {
+      roomId: /^[A-Z0-9]{4,12}$/.test(roomId) ? roomId : 'DEMO99',
+      accessToken: 'demo-owner',
+      guestToken: null,
+    };
+  }
   if (/^[A-Z0-9]{4,12}$/.test(roomId) && token) {
     return { roomId, accessToken: token, guestToken: fragment.get('guest') || null };
   }
 
-  const response = await fetch('/api/rooms', { method: 'POST' });
+  const apiUrl = runtime.apiUrl || deriveRoomApiUrl(runtime.websocketUrl);
+  const response = await fetch(apiUrl, { method: 'POST' });
   if (!response.ok) throw new Error(t('toastRoomCreateFailed'));
   const created = await response.json();
   if (!/^[A-Z0-9]{4,12}$/.test(created.roomId) || !created.ownerToken || !created.guestToken) {
@@ -188,6 +204,16 @@ async function getOrCreateRoomContext() {
   url.hash = new URLSearchParams({ token: created.ownerToken, guest: created.guestToken }).toString();
   history.replaceState(null, '', url);
   return { roomId: created.roomId, accessToken: created.ownerToken, guestToken: created.guestToken };
+}
+
+function deriveRoomApiUrl(websocketUrl) {
+  if (!websocketUrl) throw new Error('WT_RUNTIME.apiUrl is required to create a room');
+  const url = new URL(websocketUrl, window.location.href);
+  url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:';
+  url.pathname = '/api/rooms';
+  url.search = '';
+  url.hash = '';
+  return url.href;
 }
 
 function setConnectionState(label, state) {
@@ -202,14 +228,15 @@ function updatePlayVisual(paused) {
   els.playButton.setAttribute('aria-label', paused ? t('ariaPlay') : t('ariaPause'));
 }
 
-function joinRoom(nickname, { silent = false } = {}) {
+async function joinRoom(nickname, { silent = false } = {}) {
   const clean = nickname.trim().slice(0, 24);
   if (!clean) return;
   activeNickname = clean;
   localStorage.setItem('watchTogether.nickname', clean);
   setConnectionState(t('statusJoining'), 'syncing');
 
-  socket.emit('room:join', { roomId, token: accessToken, nickname: clean }, async (response) => {
+  try {
+    const response = await roomClient.join({ roomId, token: accessToken, nickname: clean });
     if (!response?.ok) {
       setConnectionState(t('statusJoinFailed'), 'offline');
       toast(response?.error || t('toastJoinFailed'));
@@ -219,12 +246,17 @@ function joinRoom(nickname, { silent = false } = {}) {
     activeRole = response.role;
     joined = true;
     reconnecting = false;
-    setConnectionState(t('statusOnline'), 'online');
+    setConnectionState(t(isDemoMode ? 'statusDemo' : 'statusOnline'), 'online');
     applySnapshot(response.snapshot);
     if (!silent && els.joinDialog.open) els.joinDialog.close();
-    await calibrateClockInitially();
-    scheduleClockCalibration();
-  });
+    if (!isDemoMode) {
+      await calibrateClockInitially();
+      scheduleClockCalibration();
+    }
+  } catch (error) {
+    setConnectionState(t('statusJoinFailed'), 'offline');
+    toast(error?.message || t('toastJoinFailed'));
+  }
 }
 
 function applySnapshot(snapshot) {
@@ -237,28 +269,27 @@ function applySnapshot(snapshot) {
   applyPlaybackState({ playback: snapshot.playback, serverTime: snapshot.serverTime }, true);
 }
 
-socket.on('connect', () => {
-  if (activeNickname && (joined || reconnecting)) {
+roomClient.onConnection(({ state }) => {
+  if (state === 'connected' && activeNickname && reconnecting) {
     reconnecting = true;
     joinRoom(activeNickname, { silent: true });
-  } else if (!joined) {
+  } else if (state === 'connected' && !joined) {
     setConnectionState(t('statusWaiting'), 'offline');
+  } else if (state === 'disconnected' && !isDemoMode) {
+    if (activeNickname) reconnecting = true;
+    joined = false;
+    setConnectionState(t('statusReconnecting'), 'syncing');
+    activeRole = null;
+    clearTimeout(clockCalibrationTimer);
+    updateCapabilities();
   }
 });
 
-socket.on('disconnect', () => {
-  if (activeNickname) reconnecting = true;
-  joined = false;
-  setConnectionState(t('statusReconnecting'), 'syncing');
-  activeRole = null;
-  clearTimeout(clockCalibrationTimer);
-  updateCapabilities();
-});
-
-socket.on('presence:update', renderMembers);
-socket.on('playback:state', (payload) => applyPlaybackState(payload, false));
-socket.on('chat:message', (message) => appendMessage(message, true));
-socket.on('room:permissions', applyPermissions);
+roomClient.onSnapshot(applySnapshot);
+roomClient.onPresence(renderMembers);
+roomClient.onPlayback((payload) => applyPlaybackState(payload, false));
+roomClient.onChat((message) => appendMessage(message, true));
+roomClient.onPermissions(applyPermissions);
 
 async function applyPlaybackState(payload, force = false) {
   const incoming = payload?.playback;
@@ -282,6 +313,7 @@ async function applyPlaybackState(payload, force = false) {
   const target = expectedPosition(incoming);
   showVideo(true);
   hidePlayerError();
+  if (incoming.paused) els.unmuteOverlay.classList.add('is-hidden');
   els.rateSelect.value = String(incoming.playbackRate || 1);
   updatePlayVisual(incoming.paused);
   warmMediaMetadata(incoming).catch(() => {});
@@ -364,7 +396,7 @@ function actualOrExpectedPosition() {
   return expectedPosition();
 }
 
-function sendPlayback(action, extra = {}) {
+async function sendPlayback(action, extra = {}) {
   if (!joined) return toast(t('toastJoinFirst'));
   if (!canControlPlayback()) return toast(t('toastNoControl'));
   if (action !== 'load' && !playback?.videoId) return;
@@ -378,9 +410,12 @@ function sendPlayback(action, extra = {}) {
     command.position = actualOrExpectedPosition();
   }
 
-  socket.emit('playback:command', command, (response) => {
+  try {
+    const response = await roomClient.sendPlayback(command);
     if (!response?.ok) toast(response?.error || t('toastCommandFailed'));
-  });
+  } catch (error) {
+    toast(error?.message || t('toastCommandFailed'));
+  }
 }
 
 function parseMediaInput(raw) {
@@ -767,20 +802,16 @@ function enableChat(enabled) {
 }
 
 function sampleClockOffset() {
-  if (!socket.connected || !joined) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const t0 = Date.now();
-    const timeout = setTimeout(() => resolve(null), 1800);
-    socket.emit('time:ping', { clientTime: t0 }, (payload) => {
-      clearTimeout(timeout);
-      const t1 = Date.now();
-      if (!Number.isFinite(payload?.serverTime)) return resolve(null);
-      resolve({
-        offset: payload.serverTime - (t0 + t1) / 2,
-        rtt: t1 - t0,
-      });
-    });
-  });
+  if (!joined) return Promise.resolve(null);
+  const t0 = Date.now();
+  return roomClient.ping({ clientTime: t0 }).then((payload) => {
+    const t1 = Date.now();
+    if (!Number.isFinite(payload?.serverTime)) return null;
+    return {
+      offset: payload.serverTime - (t0 + t1) / 2,
+      rtt: t1 - t0,
+    };
+  }).catch(() => null);
 }
 
 async function calibrateClockInitially() {
@@ -817,6 +848,10 @@ els.joinForm.addEventListener('submit', (event) => {
 });
 
 els.copyInviteButton.addEventListener('click', async () => {
+  if (isDemoMode) {
+    toast(t('toastDemoMode'));
+    return;
+  }
   try {
     const invite = new URL(window.location.href);
     invite.hash = new URLSearchParams({ token: roomContext.guestToken || accessToken }).toString();
@@ -851,14 +886,17 @@ els.unmuteButton.addEventListener('click', () => {
   els.unmuteOverlay.classList.add('is-hidden');
 });
 
-function updateRoomPermissions() {
+async function updateRoomPermissions() {
   if (activeRole !== 'owner') return;
-  socket.emit('room:permissions:update', {
-    guestControl: els.guestControlInput.checked,
-    guestChat: els.guestChatInput.checked,
-  }, (response) => {
+  try {
+    const response = await roomClient.updatePermissions({
+      guestControl: els.guestControlInput.checked,
+      guestChat: els.guestChatInput.checked,
+    });
     if (!response?.ok) toast(response?.error || t('toastPermissionsFailed'));
-  });
+  } catch (error) {
+    toast(error?.message || t('toastPermissionsFailed'));
+  }
 }
 
 els.guestControlInput.addEventListener('change', updateRoomPermissions);
@@ -905,14 +943,17 @@ els.fullscreenButton.addEventListener('click', async () => {
   }
 });
 
-els.chatForm.addEventListener('submit', (event) => {
+els.chatForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const body = els.chatInput.value.trim();
   if (!body || !joined || !canSendChat()) return;
-  socket.emit('chat:send', { body }, (response) => {
+  try {
+    const response = await roomClient.sendChat({ body });
     if (!response?.ok) toast(response?.error || t('toastSendFailed'));
-  });
-  els.chatInput.value = '';
+    else els.chatInput.value = '';
+  } catch (error) {
+    toast(error?.message || t('toastSendFailed'));
+  }
 });
 
 els.chatInput.addEventListener('keydown', (event) => {
@@ -972,8 +1013,16 @@ $('#joinDialogClose')?.addEventListener('click', () => {
   if (els.joinDialog.open) els.joinDialog.close();
 });
 
+updateCapabilities();
+if (isDemoMode) {
+  els.copyInviteButton.textContent = t('demoModeButton');
+  els.copyInviteButton.title = t('toastDemoMode');
+  setConnectionState(t('statusDemo'), 'online');
+}
 if (typeof els.joinDialog.showModal === 'function') {
   els.joinDialog.showModal();
 } else {
   els.joinDialog.setAttribute('open', '');
 }
+
+window.addEventListener('pagehide', () => roomClient.close(), { once: true });

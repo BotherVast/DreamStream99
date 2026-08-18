@@ -4,7 +4,14 @@
 
 1. **Windows 98 桌面 / IE 外壳**：标题栏、任务栏、地址栏、IE 工具栏、桌面图标、窗口拖动/缩放。
 2. **1998–2000 网页本体**：三栏 Portal、蓝色下划线链接、88×31 badge、访客计数器、小字号页脚、独立聊天室。
-3. **真实功能**：YouTube、房间同步、聊天。
+3. **真实功能**：YouTube、截图，以及可替换 RoomClient 驱动的房间同步与聊天。
+
+## Serverless 边界
+
+- GitHub Pages 只承载静态 UI；默认 `DemoRoomClient` 提供可独立展示的成员、聊天和播放状态。
+- 正式运行时切换为 `WebSocketRoomClient`，连接 Cloudflare Worker。
+- Worker 负责房间创建、Token 校验和 WebSocket Upgrade；Durable Object 按房间保存一致状态并广播。
+- RoomClient 把 UI 与传输层隔离，核心入口是 `join()`、`sendPlayback()`、`sendChat()` 和 `onSnapshot()`。
 
 ## 主要参考
 
@@ -22,8 +29,8 @@
 
 不再使用 Canvas 截图/放大系统字体。
 
-- UI / 正文：拉丁字符使用 98.css 仓库中的 Pixelated MS Sans Serif，中文回退到文泉驿点阵宋体，基础字号为 12px。
-- Logo / 大标题：沿用同一本地点阵字体栈，通过字号和字重建立层级。
+- UI / 正文：拉丁字符使用 Pixelated MS Sans Serif；中文优先使用本机已授权的方正像素12，并回退到文泉驿点阵宋体与系统中文字体，基础字号为 12px。
+- Logo / 大标题：沿用同一点阵字体栈，通过字号与字重建立层级。
 - 4K 时不是把字体单独改成一个随意的大字号，而是把整个逻辑 Win98 桌面按 2× 整数比例显示，从而保持控件、像素图标和字体之间的比例。
 
 ## HiDPI
