@@ -6,14 +6,18 @@
 
 :root {
   --ui-scale: 1;
-  --ui-font: "Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif;
-  --display-font: var(--ui-font);
-  --ui-font-size: 12px;
+  --ui-font: Tahoma, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif;
+  --display-font: "Pixelated MS Sans Serif", "FZ Pixel 12", "WenQuanYi Bitmap Song 12px", Tahoma, sans-serif;
+  --ui-font-size: 13px;
 }
 
 html,
 body,
-body * {
+button,
+input,
+textarea,
+select,
+option {
   font-family: var(--ui-font) !important;
 }
 
@@ -24,12 +28,12 @@ textarea,
 select {
   font-size: var(--ui-font-size);
   line-height: 1.25;
-  -webkit-font-smoothing: none;
-  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   font-synthesis: none;
 }
 
-/* Keep every UI surface on the same local bitmap-font stack. */
+/* Functional UI uses the readable system stack; pixel faces stay on display text. */
 .media-site,
 .chat-site,
 .web-box,
@@ -250,24 +254,33 @@ body {
   background-size: auto !important;
 }
 
-/* ---- native-size bitmap UI typography ---- */
+/* ---- readable UI typography ---- */
 .web-box,
 .web-box h2,
 .login-box input,
 .login-box .tiny-button,
 .room-line,
+.role-badge,
+.room-permissions,
 .source-row,
+.youtube-badge,
+.player-message-overlay strong,
+.media-control,
+.time-label,
+.web-action,
 .old-web-footer,
 .chat-site,
+.member-kind,
 .chat-action-row button,
-.chat-form textarea {
+.chat-form textarea,
+.visitor-counter b {
   font-size: var(--ui-font-size) !important;
 }
-.message { font-size: var(--ui-font-size) !important; line-height: 15px !important; }
-.message-time { font-size: var(--ui-font-size) !important; }
+.message { font-size: var(--ui-font-size) !important; line-height: 17px !important; }
+.message-time { font-size: 11px !important; }
 .media-tagline,
 .chat-site-footer,
-.smiley-strip a { font-size: var(--ui-font-size) !important; }
+.smiley-strip a { font-size: 11px !important; }
 
 /* ---- taskbar is now interactive ---- */
 .taskbar {
@@ -337,7 +350,7 @@ body {
   transform-origin: right bottom;
 }
 
-/* The bundled Chinese bitmap face is designed for a 12px strike. */
+/* Do not shrink functional UI copy below the readable base size. */
 .chat-site-nav,
 .member-chip,
 .presence-legend,
