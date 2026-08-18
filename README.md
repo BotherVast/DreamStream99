@@ -1,126 +1,100 @@
-# DreamStream 99 — Windows 98 / Retro Web 版
+# DreamStream 99
 
-DreamStream 99 是一个用于朋友同步观看 YouTube、实时聊天的个人项目。界面模拟 Windows 98 桌面：左侧是 90 年代在线视频站，右侧是独立聊天室网页。
+Windows 98 视觉风格的 YouTube 同步观影与实时聊天应用。
 
-## 本地启动
+![DreamStream 99 主界面](docs/images/dreamstream-overview.jpg)
 
-环境要求：Node.js 20 或更高版本（推荐 Node 20 LTS），以及随 Node 安装的 npm。项目不需要数据库，也没有必须配置的 API Key 或 `.env` 文件。
+## 功能
 
-macOS / Linux 使用 nvm 时，先切换到仓库推荐的 Node 版本：
+- 同步加载、播放、暂停、跳转与倍速状态
+- GitHub Pages 中可直接体验的模拟聊天与在线成员列表
+- 房主 / 访客令牌及独立的播放、聊天权限
+- 可拖动、缩放、最小化和最大化的桌面窗口
+- 清晰的系统 UI 字体、复古展示字体、可替换素材与高 DPI 整数倍缩放
+- GitHub Pages 静态演示模式
 
-```bash
-nvm install
-nvm use
-```
+## Serverless 架构
 
-安装锁文件中的依赖、执行完整校验并启动：
+- GitHub Pages：Win98 UI、YouTube 播放器与截图工具
+- Cloudflare Worker（下一阶段）：创建房间、Token 校验与 WebSocket Upgrade
+- Durable Object（下一阶段）：每个房间的播放状态、成员、聊天与广播
+- 原生 HTML、CSS、JavaScript；构建与测试使用 Node.js
+
+线上演示：<https://bothervast.github.io/DreamStream99/>
+
+不需要常驻 Node 服务、Redis、传统数据库或运维 VPS。仓库中的 Express / Socket.IO 服务仅作为已有同步原型保留，不是 Pages 部署依赖。
+
+## 快速开始
+
+需要 Node.js 20 或更高版本。
 
 ```bash
 npm ci
-npm run verify
 npm start
 ```
 
-浏览器打开 <http://localhost:3000>。服务健康检查地址是 <http://localhost:3000/healthz>。
+打开 <http://localhost:3000>。页面会自动创建房间；输入昵称连接后，即可载入 YouTube 链接并通过“邀请朋友”复制访客链接。
 
-开发时可以使用自动重启模式：
+开发模式：
 
 ```bash
 npm run dev
 ```
 
-如果 3000 端口被占用，macOS / Linux 可改用：
+使用其他端口：
 
 ```bash
 PORT=3001 npm start
 ```
 
-Windows PowerShell 对应写法：
+## 配置
 
-```powershell
-$env:PORT=3001; npm start
-```
+| 文件 | 用途 |
+| --- | --- |
+| [`public/config.js`](public/config.js) | 文案、主题、窗口、桌面图标与默认素材 |
+| [`public/assets-config.js`](public/assets-config.js) | 快速覆盖 Logo、背景和图标 |
+| [`public/runtime-config.js`](public/runtime-config.js) | 后端地址与运行模式 |
+| [`ASSET_GUIDE.md`](ASSET_GUIDE.md) | 自定义素材说明 |
 
-此时请打开 <http://localhost:3001>。界面字体已随项目在本地提供；只有使用 YouTube 播放器时，浏览器才需要访问 YouTube。本地页面、房间同步和聊天服务本身不需要第三方账号。
-
-## 这版主要变化
-
-- 中文改为 **文泉驿点阵宋体 12px**；英文改为 98.css 使用的 **Pixelated MS Sans Serif**。两种都直接作为设计好的点阵/像素字形使用，不再用 Canvas 把系统字体截图放大。
-- 字体通过 `config.js` 中的本地 URL 加载，不依赖 CDN。
-- 4K / 高 DPI 使用整数倍“虚拟桌面”缩放。`auto` 会结合 `devicePixelRatio` 判断 4K；也可在 `config.js` 强制 `uiScale: 2`。
-- 两个浏览器窗口都可以拖动、从八个边/角改变大小。
-- 最小化、最大化/还原、关闭按钮都有实际作用；双击标题栏也可最大化/还原。
-- 任务栏按钮可以切换/恢复窗口；关闭后可双击桌面的“我的媒体”或“聊天室”图标重新打开。
-- 窗口位置、尺寸和桌面图标位置会保存到浏览器。
-- IE 工具栏按钮改为从 Windows 98 / IE 历史界面截图提取的小尺寸图像；桌面/系统图标优先引用 Win98 图标档案。
-- Logo、网页页眉背景、正文背景、桌面壁纸、工具栏图标等新增独立的 `public/assets-config.js` 快捷覆盖文件。详见 `ASSET_GUIDE.md`。
-
-## 字体设置
-
-`public/config.js`：
-
-```js
-fonts: {
-  latinRegularUrl: '...',
-  latinBoldUrl: '...',
-  cjkUrl: '...',
-},
-
-theme: {
-  fontFamily: '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif',
-  displayFontFamily: '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif',
-},
-```
-
-默认 UI、正文与标题统一使用本地点阵字体栈：拉丁字符优先使用 Pixelated MS Sans Serif，中文自动回退到文泉驿点阵宋体，并以 12px 作为 UI 基准字号。字体文件位于 `public/assets/fonts/`，来源与许可证见 `THIRD_PARTY_NOTICES.md`。
-
-## 4K
-
-默认：
-
-```js
-display: {
-  uiScale: 'auto',
-}
-```
-
-在全屏 4K、即使 Windows 设置 150% 或 200% 缩放时，会依据 CSS 视口 × `devicePixelRatio` 判断并切到 2×。如果自动判断与你的浏览器窗口大小不合适，直接改成：
-
-```js
-uiScale: 2,
-```
-
-## 窗口操作
-
-- 拖标题栏：移动。
-- 拖窗口四边/四角：改变大小。
-- `_`：最小化。
-- `□`：最大化；最大化后同一按钮变为还原。
-- `×`：关闭。
-- 双击标题栏：最大化/还原。
-- 点击任务栏按钮：激活窗口；再次点击当前活动窗口可最小化。
-
-重置窗口和桌面图标布局：
+自定义图片建议放在 `public/assets/custom/`。如需清除浏览器中保存的窗口和图标位置，可访问：
 
 ```text
 http://localhost:3000/?resetLayout=1
 ```
 
-## 美术/文案配置
+UI 通过 `RoomClient` 与房间传输解耦：`DemoRoomClient` 用于 Pages 静态展示，`WebSocketRoomClient` 预留给 Worker + Durable Object。核心接口包括 `join()`、`sendPlayback()`、`sendChat()` 和 `onSnapshot()`。
 
-- 文案：`public/config.js` 的 `copy` / `oldWeb`
-- 图片快捷覆盖：`public/assets-config.js`
-- 图片默认值 / 桌面图标：`public/config.js` 的 `assets` / `desktopIcons`
-- 自己的图片建议放：`public/assets/custom/`
-- 详细说明：`ASSET_GUIDE.md`
+### 字体
 
-## 测试
+功能性 UI 与正文使用 13px 系统字体栈，确保普通 1× 屏幕上的中英文清晰可读。Pixelated MS Sans Serif、可选的“方正像素12”和文泉驿点阵宋体只用于 Logo、大标题等复古展示文字。
 
-```powershell
-npm test
-npm run check
+项目不分发方正字体文件。如已取得相应的 Web 嵌入授权，可把字体放入 `public/assets/fonts/`，再设置 `public/config.js`：
+
+```js
+fonts: {
+  preferredCjkUrl: '/assets/fonts/your-licensed-fz-pixel-12.ttf',
+}
 ```
 
-## 第三方来源
+页面与静态资源统一使用 UTF-8；多级中文回退用于避免缺字方框和编码乱码。
 
-详见 `THIRD_PARTY_NOTICES.md`。
+## 可用命令
+
+| 命令 | 说明 |
+| --- | --- |
+| `npm start` | 启动应用服务 |
+| `npm run dev` | 监听文件变化并自动重启 |
+| `npm run build` | 生成 `dist/` 静态站点 |
+| `npm test` | 运行测试 |
+| `npm run check` | 检查 JavaScript 语法 |
+| `npm run verify` | 运行语法检查与测试 |
+
+## 部署说明
+
+`npm run build` 生成完全静态的 GitHub Pages 演示版，不提供跨设备同步；推送到 `main` 后，仓库内的 GitHub Actions 工作流会自动校验、构建并部署 `dist/`。构建过程会自动把资源路径改写为适用于项目子路径的相对 URL，并强制使用 `demo` 运行模式。
+
+本地保留的 Node 同步原型仍可用于联调；正式多人同步将由 Cloudflare Worker + Durable Object 接管。
+
+## 许可
+
+项目代码采用 [MIT License](LICENSE)。字体与图像素材的来源及许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
