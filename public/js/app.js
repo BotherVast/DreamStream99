@@ -1,4 +1,4 @@
-import { YouTubeAdapter } from './youtube-adapter.js';
+import { getYouTubePosterSources, YouTubeAdapter } from './youtube-adapter.js';
 import { createRoomClient } from './room-client.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -94,8 +94,10 @@ const els = {
   emptyPlayer: $('#emptyPlayer'),
   youtubeSurface: $('#youtubeSurface'),
   youtubeHost: $('#youtubeHost'),
+  youtubePoster: $('#youtubePoster'),
+  youtubePosterImage: $('#youtubePosterImage'),
+  youtubePosterStatus: $('#youtubePosterStatus'),
   youtubeBadge: $('#youtubeBadge'),
-  youtubeInteractionShield: $('#youtubeInteractionShield'),
   playerErrorOverlay: $('#playerErrorOverlay'),
   playerErrorMessage: $('#playerErrorMessage'),
   retryPlayerButton: $('#retryPlayerButton'),
@@ -172,6 +174,7 @@ const youtube = new YouTubeAdapter(els.youtubeHost, {
     els.unmuteOverlay.classList.remove('is-hidden');
     toast(t('toastAutoplayMuted'));
   },
+  onPresentationChange: renderYouTubePresentation,
   onInitError: (error) => showPlayerError(error?.message),
   onError: (code) => toast(t('toastYoutubeError', { code })),
 });
@@ -332,6 +335,26 @@ function showVideo(hasVideo) {
   if (hasVideo) els.youtubeBadge.textContent = t('youtubeLabel');
 
   updateControlsEnabled(hasVideo);
+}
+
+function renderYouTubePresentation({ state = 'idle', videoId = null } = {}) {
+  const showPoster = Boolean(videoId && state !== 'playing');
+  els.youtubeHost.classList.toggle('is-concealed', showPoster);
+  els.youtubePoster.classList.toggle('is-hidden', !showPoster);
+  if (!showPoster) return;
+
+  if (els.youtubePosterImage.dataset.videoId !== videoId) {
+    const { primary, fallback } = getYouTubePosterSources(videoId);
+    els.youtubePosterImage.dataset.videoId = videoId;
+    els.youtubePosterImage.onerror = () => {
+      els.youtubePosterImage.onerror = null;
+      els.youtubePosterImage.src = fallback;
+    };
+    els.youtubePosterImage.src = primary;
+  }
+
+  const labels = { loading: 'LOADING…', paused: 'PAUSED', ended: 'ENDED' };
+  els.youtubePosterStatus.textContent = labels[state] || 'READY';
 }
 
 function updateControlsEnabled(enabled) {

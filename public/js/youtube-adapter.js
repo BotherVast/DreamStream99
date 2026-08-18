@@ -3,6 +3,27 @@ const API_TIMEOUT_MS = 10000;
 const PLAYER_TIMEOUT_MS = 10000;
 let apiPromise = null;
 
+export function createYouTubePlayerVars(origin) {
+  return {
+    autoplay: 0,
+    controls: 0,
+    disablekb: 1,
+    fs: 0,
+    iv_load_policy: 3,
+    playsinline: 1,
+    rel: 0,
+    origin,
+  };
+}
+
+export function getYouTubePosterSources(videoId) {
+  const safeVideoId = encodeURIComponent(String(videoId || ''));
+  return {
+    primary: `https://i.ytimg.com/vi/${safeVideoId}/maxresdefault.jpg`,
+    fallback: `https://i.ytimg.com/vi/${safeVideoId}/hqdefault.jpg`,
+  };
+}
+
 function loadYouTubeApi() {
   if (window.YT?.Player) return Promise.resolve(window.YT);
   if (apiPromise) return apiPromise;
@@ -70,6 +91,7 @@ export class YouTubeAdapter {
     this.remoteApplyGeneration = 0;
     this.shouldBePlaying = false;
     this.autoplayRecoveryPromise = null;
+    this.presentationState = 'idle';
   }
 
   async ensurePlayer() {
@@ -105,16 +127,12 @@ export class YouTubeAdapter {
         this.player = new YT.Player(slot, {
           width: '100%',
           height: '100%',
-          playerVars: {
-            controls: 0,
-            disablekb: 1,
-            playsinline: 1,
-            rel: 0,
-            origin: window.location.origin,
-          },
+          playerVars: createYouTubePlayerVars(window.location.origin),
           events: {
             onReady: () => {
               this.ready = true;
+              const iframe = this.player?.getIframe?.();
+              iframe?.setAttribute('tabindex', '-1');
               finish();
             },
             onStateChange: (event) => this.handleStateChange(event),
@@ -134,7 +152,18 @@ export class YouTubeAdapter {
   handleStateChange(event) {
     if (!this.player) return;
     const states = window.YT.PlayerState;
-    if (event.data === states.BUFFERING) return;
+
+    if (event.data === states.PLAYING) {
+      this.setPresentationState('playing');
+    } else if (event.data === states.ENDED) {
+      this.setPresentationState('ended');
+    } else if (event.data === states.PAUSED || event.data === states.CUED) {
+      this.setPresentationState(this.shouldBePlaying ? 'loading' : 'paused');
+    } else if (event.data === states.BUFFERING) {
+      if (this.shouldBePlaying) this.setPresentationState('loading');
+      return;
+    }
+
     if (this.isApplyingRemoteState) return;
 
     if (event.data === states.PLAYING) {
@@ -176,14 +205,15 @@ export class YouTubeAdapter {
   }
 
   async apply(playback, targetSeconds) {
-    await this.ensurePlayer();
+    const changedVideo = this.videoId !== playback.videoId;
+    this.videoId = playback.videoId;
     this.shouldBePlaying = !playback.paused;
+    this.setPresentationState(playback.paused ? 'paused' : 'loading');
+    await this.ensurePlayer();
 
     await this.runRemoteOperation(async () => {
       const position = Math.max(0, targetSeconds);
-      const changedVideo = this.videoId !== playback.videoId;
       if (changedVideo) {
-        this.videoId = playback.videoId;
         if (playback.paused) this.player.cueVideoById({ videoId: playback.videoId, startSeconds: position });
         else this.player.loadVideoById({ videoId: playback.videoId, startSeconds: position });
       } else {
@@ -199,7 +229,9 @@ export class YouTubeAdapter {
           this.player.pauseVideo();
         }
         await delay(0);
+        this.setPresentationState('paused');
       } else {
+        this.setPresentationState('loading');
         this.player.playVideo();
         await this.ensurePlaybackStarted();
       }
@@ -279,6 +311,12 @@ export class YouTubeAdapter {
     return data?.title || '';
   }
 
+  setPresentationState(state) {
+    if (this.presentationState === state) return;
+    this.presentationState = state;
+    this.callbacks.onPresentationChange?.({ state, videoId: this.videoId });
+  }
+
   resetPlayer() {
     try {
       this.player?.destroy?.();
@@ -294,6 +332,7 @@ export class YouTubeAdapter {
     this.shouldBePlaying = false;
     this.autoplayRecoveryPromise = null;
     this.remoteApplyGeneration += 1;
+    this.setPresentationState('idle');
   }
 
   destroy() {
