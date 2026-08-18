@@ -66,7 +66,7 @@ UI 通过 `RoomClient` 与房间传输解耦：`DemoRoomClient` 用于 Pages 静
 
 ### 字体
 
-功能性 UI 与正文使用 13px 系统字体栈，确保普通 1× 屏幕上的中英文清晰可读。Pixelated MS Sans Serif、可选的“方正像素12”和文泉驿点阵宋体只用于 Logo、大标题等复古展示文字。
+功能性 UI、正文和标题统一使用 12px 点阵字体栈：拉丁字符为 Pixelated MS Sans Serif；中文优先尝试本机安装的“方正像素12”（同时兼容 `FZXS12--GB1-0` / `FZXS12`），不可用或遇到缺字时回退到随项目提供的文泉驿点阵宋体和系统中文字体。
 
 项目不分发方正字体文件。如已取得相应的 Web 嵌入授权，可把字体放入 `public/assets/fonts/`，再设置 `public/config.js`：
 
