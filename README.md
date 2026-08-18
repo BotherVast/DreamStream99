@@ -1,6 +1,6 @@
-# Watch Together — Windows 98 / Retro Web 版
+# DreamStream 99 — Windows 98 / Retro Web 版
 
-一个用于朋友同步观看 YouTube、实时聊天的个人项目。界面模拟 Windows 98 桌面：左侧是 90 年代在线视频站，右侧是独立聊天室网页。
+DreamStream 99 是一个用于朋友同步观看 YouTube、实时聊天的个人项目。界面模拟 Windows 98 桌面：左侧是 90 年代在线视频站，右侧是独立聊天室网页。
 
 ## 本地启动
 
@@ -67,12 +67,12 @@ fonts: {
 },
 
 theme: {
-  fontFamily: 'Tahoma, "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif',
-  displayFontFamily: '"WT MS Sans Pixel", "WT WQY Bitmap Song", Tahoma, sans-serif',
+  fontFamily: '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif',
+  displayFontFamily: '"Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif',
 },
 ```
 
-默认 UI 和正文使用系统清晰字体；Pixelated MS Sans Serif 仅用于 Logo、大标题等复古展示文字，文泉驿点阵宋体作为展示字体的中文回退。这样在普通 1× 屏幕上也能读清小字号文字。字体文件位于 `public/assets/fonts/`，来源与许可证见 `THIRD_PARTY_NOTICES.md`。
+默认 UI、正文与标题统一使用本地点阵字体栈：拉丁字符优先使用 Pixelated MS Sans Serif，中文自动回退到文泉驿点阵宋体，并以 12px 作为 UI 基准字号。字体文件位于 `public/assets/fonts/`，来源与许可证见 `THIRD_PARTY_NOTICES.md`。
 
 ## 4K
 

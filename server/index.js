@@ -6,24 +6,44 @@ import express from 'express';
 import { Server as SocketIOServer } from 'socket.io';
 import {
   applyPlaybackCommand,
-  createInitialPlayback,
   isValidRoomId,
   normalizeChat,
   normalizeNickname,
 } from './room-state.js';
+import {
+  authenticateRoomToken,
+  canChat,
+  canControl,
+  createRoomRecord,
+  getActionRevision,
+  rememberAction,
+  touchRoom,
+} from './rooms.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 const port = Number(process.env.PORT || 3000);
+const roomAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const rooms = new Map();
 
 const app = express();
 app.disable('x-powered-by');
+app.use(express.json({ limit: '16kb' }));
+
+app.post('/api/rooms', (_req, res) => {
+  const id = createUniqueRoomId();
+  const ownerToken = crypto.randomBytes(16).toString('base64url');
+  const guestToken = crypto.randomBytes(16).toString('base64url');
+  rooms.set(id, createRoomRecord({ id, ownerToken, guestToken }));
+  res.status(201).set('Cache-Control', 'no-store').json({ roomId: id, ownerToken, guestToken });
+});
+
+app.get('/healthz', (_req, res) => res.json({ ok: true, now: Date.now() }));
 app.use(express.static(path.join(rootDir, 'public'), {
   extensions: ['html'],
   maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0,
 }));
-app.get('/healthz', (_req, res) => res.json({ ok: true, now: Date.now() }));
 
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
@@ -31,28 +51,19 @@ const io = new SocketIOServer(server, {
   maxHttpBufferSize: 1e6,
 });
 
-const rooms = new Map();
-
-function getRoom(roomId) {
-  let room = rooms.get(roomId);
-  if (!room) {
-    room = {
-      id: roomId,
-      playback: createInitialPlayback(),
-      clients: new Map(),
-      messages: [],
-      lastActive: Date.now(),
-    };
-    rooms.set(roomId, room);
-  }
-  room.lastActive = Date.now();
-  return room;
+function createUniqueRoomId() {
+  do {
+    const bytes = crypto.randomBytes(6);
+    const roomId = [...bytes].map((byte) => roomAlphabet[byte % roomAlphabet.length]).join('');
+    if (!rooms.has(roomId)) return roomId;
+  } while (true);
 }
 
 function publicMembers(room) {
-  return [...room.clients.values()].map(({ clientId, nickname }) => ({
+  return [...room.members.values()].map(({ clientId, nickname, role }) => ({
     clientId,
     nickname,
+    role,
   }));
 }
 
@@ -60,24 +71,19 @@ function snapshot(room) {
   return {
     roomId: room.id,
     serverTime: Date.now(),
+    permissions: { ...room.permissions },
     playback: room.playback,
     members: publicMembers(room),
-    messages: room.messages.slice(-60),
+    messages: room.messages.slice(-100),
   };
 }
 
 function broadcastPresence(room) {
-  const members = publicMembers(room);
-  io.to(room.id).emit('presence:update', members);
+  io.to(room.id).emit('presence:update', publicMembers(room));
 }
 
 function broadcastPlayback(room) {
-  const payload = { playback: room.playback, serverTime: Date.now() };
-  io.to(room.id).emit('playback:state', payload);
-}
-
-function broadcastChat(room, message) {
-  io.to(room.id).emit('chat:message', message);
+  io.to(room.id).emit('playback:state', { playback: room.playback, serverTime: Date.now() });
 }
 
 function addChat(room, actor, body) {
@@ -92,21 +98,15 @@ function addChat(room, actor, body) {
   };
   room.messages.push(message);
   if (room.messages.length > 100) room.messages.splice(0, room.messages.length - 100);
-  room.lastActive = Date.now();
+  touchRoom(room);
   return message;
-}
-
-function applyCommand(room, actor, command) {
-  room.playback = applyPlaybackCommand(room.playback, command, actor, Date.now());
-  room.lastActive = Date.now();
-  broadcastPlayback(room);
 }
 
 function leaveClient(roomId, clientId) {
   const room = rooms.get(roomId);
   if (!room) return;
-  room.clients.delete(clientId);
-  room.lastActive = Date.now();
+  room.members.delete(clientId);
+  touchRoom(room);
   broadcastPresence(room);
 }
 
@@ -117,18 +117,28 @@ io.on('connection', (socket) => {
     try {
       const roomId = String(payload?.roomId || '').toUpperCase();
       if (!isValidRoomId(roomId)) throw new Error('房间号应为 4–12 位字母或数字');
+      const room = rooms.get(roomId);
+      const role = authenticateRoomToken(room, payload?.token);
+      if (!room || !role || room.expiresAt <= Date.now()) {
+        throw new Error('房间不存在、已过期或邀请令牌无效');
+      }
 
-      const room = getRoom(roomId);
+      if (session) {
+        leaveClient(session.roomId, session.actor.clientId);
+        socket.leave(session.roomId);
+      }
+
       const actor = {
         clientId: crypto.randomUUID(),
         nickname: normalizeNickname(payload?.nickname),
+        role,
       };
       session = { roomId, actor };
       socket.join(roomId);
-      room.clients.set(actor.clientId, actor);
-      room.lastActive = Date.now();
+      room.members.set(actor.clientId, actor);
+      touchRoom(room);
 
-      ack({ ok: true, clientId: actor.clientId, snapshot: snapshot(room) });
+      ack({ ok: true, clientId: actor.clientId, role, snapshot: snapshot(room) });
       broadcastPresence(room);
     } catch (error) {
       ack({ ok: false, error: error.message });
@@ -140,8 +150,36 @@ io.on('connection', (socket) => {
       if (!session) throw new Error('Not joined');
       const room = rooms.get(session.roomId);
       if (!room) throw new Error('Room expired');
-      applyCommand(room, session.actor, command || {});
+      if (!canControl(room, session.actor.role)) throw new Error('你没有控制播放的权限');
+
+      const previousRevision = getActionRevision(room, command?.actionId);
+      if (previousRevision !== undefined) {
+        return ack({ ok: true, duplicate: true, revision: previousRevision });
+      }
+
+      room.playback = applyPlaybackCommand(room.playback, command || {}, session.actor, Date.now());
+      rememberAction(room, room.playback.actionId, room.playback.revision);
+      touchRoom(room);
+      broadcastPlayback(room);
       ack({ ok: true, revision: room.playback.revision });
+    } catch (error) {
+      ack({ ok: false, error: error.message });
+    }
+  });
+
+  socket.on('room:permissions:update', (payload, ack = () => {}) => {
+    try {
+      if (!session) throw new Error('Not joined');
+      const room = rooms.get(session.roomId);
+      if (!room) throw new Error('Room expired');
+      if (session.actor.role !== 'owner') throw new Error('只有房主可以修改权限');
+      room.permissions = {
+        guestControl: Boolean(payload?.guestControl),
+        guestChat: Boolean(payload?.guestChat),
+      };
+      touchRoom(room);
+      io.to(room.id).emit('room:permissions', { ...room.permissions });
+      ack({ ok: true, permissions: { ...room.permissions } });
     } catch (error) {
       ack({ ok: false, error: error.message });
     }
@@ -151,13 +189,18 @@ io.on('connection', (socket) => {
     if (!session) return ack({ ok: false, error: 'Not joined' });
     const room = rooms.get(session.roomId);
     if (!room) return ack({ ok: false, error: 'Room expired' });
+    if (!canChat(room, session.actor.role)) return ack({ ok: false, error: '你没有发送聊天的权限' });
     const message = addChat(room, session.actor, payload?.body);
     if (!message) return ack({ ok: false, error: 'Empty message' });
-    broadcastChat(room, message);
+    io.to(room.id).emit('chat:message', message);
     ack({ ok: true, id: message.id });
   });
 
   socket.on('time:ping', (payload, ack = () => {}) => {
+    if (session) {
+      const room = rooms.get(session.roomId);
+      if (room) touchRoom(room);
+    }
     ack({ clientTime: Number(payload?.clientTime || 0), serverTime: Date.now() });
   });
 
@@ -167,12 +210,12 @@ io.on('connection', (socket) => {
 });
 
 setInterval(() => {
-  const cutoff = Date.now() - 60 * 60 * 1000;
+  const now = Date.now();
   for (const [roomId, room] of rooms) {
-    if (room.clients.size === 0 && room.lastActive < cutoff) rooms.delete(roomId);
+    if (room.members.size === 0 && room.expiresAt <= now) rooms.delete(roomId);
   }
 }, 10 * 60 * 1000).unref();
 
 server.listen(port, '0.0.0.0', () => {
-  console.log(`Watch Together running at http://localhost:${port}`);
+  console.log(`DreamStream running at http://localhost:${port}`);
 });

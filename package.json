@@ -1,14 +1,14 @@
 {
-  "name": "watch-together-retroweb",
+  "name": "dreamstream",
   "version": "0.5.0",
   "private": true,
   "type": "module",
-  "description": "Synchronized YouTube watch party with a draggable, resizable Windows 98 desktop, retro websites, bitmap-style fonts, and HiDPI integer scaling.",
+  "description": "DreamStream is a synchronized YouTube watch party with a draggable, resizable Windows 98 desktop, retro websites, bitmap-style fonts, and HiDPI integer scaling.",
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test tests/*.test.js",
-    "check": "node --check server/index.js && node --check server/room-state.js && node --check public/assets-config.js && node --check public/js/desktop.js && node --check public/js/app.js && node --check public/js/youtube-adapter.js",
+    "check": "node --check server/index.js && node --check server/room-state.js && node --check server/rooms.js && node --check public/assets-config.js && node --check public/js/desktop.js && node --check public/js/app.js && node --check public/js/youtube-adapter.js",
     "verify": "npm run check && npm test"
   },
   "engines": {

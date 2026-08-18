@@ -6,17 +6,14 @@
 
 :root {
   --ui-scale: 1;
-  --ui-font: Tahoma, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif;
-  --display-font: "WT MS Sans Pixel", "WT WQY Bitmap Song", Tahoma, sans-serif;
+  --ui-font: "Pixelated MS Sans Serif", "WenQuanYi Bitmap Song 12px", "MS Sans Serif", sans-serif;
+  --display-font: var(--ui-font);
+  --ui-font-size: 12px;
 }
 
 html,
 body,
-button,
-input,
-textarea,
-select,
-option {
+body * {
   font-family: var(--ui-font) !important;
 }
 
@@ -25,15 +22,14 @@ button,
 input,
 textarea,
 select {
-  font-size: 13px;
+  font-size: var(--ui-font-size);
   line-height: 1.25;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: none;
+  text-rendering: optimizeSpeed;
   font-synthesis: none;
 }
 
-/* Old-site content should use the same deliberately-designed pixel fonts.
-   This removes Arial/SimSun/Courier fallbacks that caused mixed rendering. */
+/* Keep every UI surface on the same local bitmap-font stack. */
 .media-site,
 .chat-site,
 .web-box,
@@ -42,7 +38,7 @@ select {
 .login-box button,
 .now-watching,
 .room-line,
-.provider-badge,
+.youtube-badge,
 .media-control,
 .time-label,
 .source-row,
@@ -254,7 +250,7 @@ body {
   background-size: auto !important;
 }
 
-/* ---- readable UI typography; pixel faces are reserved for display text ---- */
+/* ---- native-size bitmap UI typography ---- */
 .web-box,
 .web-box h2,
 .login-box input,
@@ -265,13 +261,13 @@ body {
 .chat-site,
 .chat-action-row button,
 .chat-form textarea {
-  font-size: 13px !important;
+  font-size: var(--ui-font-size) !important;
 }
-.message { font-size: 13px !important; line-height: 17px !important; }
-.message-time { font-size: 11px !important; }
+.message { font-size: var(--ui-font-size) !important; line-height: 15px !important; }
+.message-time { font-size: var(--ui-font-size) !important; }
 .media-tagline,
 .chat-site-footer,
-.smiley-strip a { font-size: 11px !important; }
+.smiley-strip a { font-size: var(--ui-font-size) !important; }
 
 /* ---- taskbar is now interactive ---- */
 .taskbar {
@@ -341,7 +337,7 @@ body {
   transform-origin: right bottom;
 }
 
-/* Do not shrink functional UI copy below the readable base size. */
+/* The bundled Chinese bitmap face is designed for a 12px strike. */
 .chat-site-nav,
 .member-chip,
 .presence-legend,
@@ -350,5 +346,5 @@ body {
 .compact-box li,
 .chat-site-footer,
 .smiley-strip a {
-  font-size: 13px !important;
+  font-size: var(--ui-font-size) !important;
 }

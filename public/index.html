@@ -4,7 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="light" />
-  <title>PixelStream 99</title>
+  <meta name="referrer" content="no-referrer" />
+  <title>DreamStream 99</title>
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/css/windowing.css" />
   <script src="/config.js"></script>
@@ -20,7 +21,7 @@
         <div class="title-bar">
           <div class="title-bar-text">
             <img src="/assets/retro/ie.png" data-asset="windowIcon" data-fallback="/assets/retro/ie.png" alt="" class="title-icon" />
-            <span id="mediaWindowTitle" data-copy="mediaTitle">PixelStream 99</span>
+            <span id="mediaWindowTitle" data-copy="mediaTitle">DreamStream 99</span>
           </div>
           <div class="title-bar-controls">
             <button class="caption-button minimize" type="button" data-window-action="minimize" aria-label="最小化" title="最小化"></button>
@@ -51,7 +52,7 @@
 
         <div class="address-bar">
           <span class="address-label" data-copy="addressLabel">地址</span>
-          <div class="address-field"><img src="/assets/retro/ie.png" data-asset="windowIcon" data-fallback="/assets/retro/ie.png" alt="" /><span id="mediaAddress">http://pixelstream99.local/</span></div>
+          <div class="address-field"><img src="/assets/retro/ie.png" data-asset="windowIcon" data-fallback="/assets/retro/ie.png" alt="" /><span id="mediaAddress">http://dreamstream99.local/</span></div>
           <button class="address-go" type="button"><span data-copy="go">转到</span></button>
           <button class="address-links" type="button"><span data-copy="links">链接</span> »</button>
         </div>
@@ -63,7 +64,7 @@
               <span class="brand-orbit"></span><span class="brand-film">▰ ▰ ▰</span><span class="brand-star">★</span>
             </div>
             <div class="media-brand-wrap">
-              <div class="media-brand" data-config-oldweb="mediaBrand">PixelStream 99</div>
+              <div class="media-brand" data-config-oldweb="mediaBrand">DreamStream 99</div>
               <div class="media-tagline" data-config-oldweb="mediaTagline">WATCH TOGETHER · ANYWHERE ON THE WEB!</div>
             </div>
           </header>
@@ -111,7 +112,7 @@
             <main class="watch-column">
               <section class="watch-panel">
                 <h1 class="now-watching" data-copy="nowWatching">★ NOW WATCHING TOGETHER! ★</h1>
-                <div class="room-line"><span data-copy="currentRoom">当前房间</span>: <strong id="roomLabel" class="room-code">------</strong> · <span id="watcherCountMirror">0</span> <span data-copy="watchingNow">人正在房间中</span> · <span id="syncStatus" class="sync-status" data-state="offline" data-copy="statusWaiting">等待连接</span></div>
+                <div class="room-line"><span data-copy="currentRoom">当前房间</span>: <strong id="roomLabel" class="room-code">------</strong> <span id="roleBadge" class="role-badge is-hidden"></span> · <span id="watcherCountMirror">0</span> <span data-copy="watchingNow">人正在房间中</span> · <span id="syncStatus" class="sync-status" data-state="offline" data-copy="statusWaiting">等待连接</span></div>
 
                 <div class="player-frame">
                   <div class="player-stage" id="playerStage">
@@ -120,8 +121,18 @@
                       <strong data-copy="emptyTitle">NO VIDEO LOADED</strong>
                       <span data-copy="emptyText">Paste a video URL below.</span>
                     </div>
-                    <div id="youtubeSurface" class="player-surface is-hidden"><div id="youtubeHost" class="youtube-host"></div></div>
-                    <div id="providerBadge" class="provider-badge is-hidden"></div>
+                    <div id="youtubeSurface" class="player-surface is-hidden">
+                      <div id="youtubeHost" class="youtube-host"></div>
+                      <div id="youtubeInteractionShield" class="youtube-interaction-shield" aria-hidden="true"></div>
+                    </div>
+                    <div id="youtubeBadge" class="youtube-badge is-hidden">YouTube</div>
+                    <div id="playerErrorOverlay" class="player-message-overlay is-hidden" role="alert">
+                      <strong id="playerErrorMessage">YouTube 播放器网络超时</strong>
+                      <button id="retryPlayerButton" type="button" data-copy="retryPlayer">重试</button>
+                    </div>
+                    <div id="unmuteOverlay" class="player-message-overlay unmute-overlay is-hidden">
+                      <button id="unmuteButton" type="button" data-copy="unmuteAndSync">📢 点击取消静音并同步</button>
+                    </div>
                   </div>
                 </div>
 
@@ -152,6 +163,11 @@
                   <button class="web-action purple" type="button">POP OUT</button>
                   <button class="web-action gold" type="button">★ ADD FAVE</button>
                 </div>
+                <fieldset id="roomPermissions" class="room-permissions" hidden>
+                  <legend data-copy="guestPermissions">访客权限</legend>
+                  <label><input id="guestControlInput" type="checkbox" /> <span data-copy="allowGuestControl">允许控制播放</span></label>
+                  <label><input id="guestChatInput" type="checkbox" checked /> <span data-copy="allowGuestChat">允许发送聊天</span></label>
+                </fieldset>
               </section>
 
               <div class="lower-web-grid">
@@ -169,7 +185,7 @@
             <aside class="site-column right-site-column">
               <section class="web-box yellow-box">
                 <h2 data-copy="featuredDownload">FEATURED DOWNLOAD</h2>
-                <div class="download-card"><img data-asset="site.featuredIcon" src="/assets/retro/computer.png" data-fallback="/assets/retro/computer.png" alt="" /><div><a href="#" data-copy="featuredName">PixelStream Player 2.0</a><p data-copy="featuredCopy">Faster. Better. Totally Rad.</p></div></div>
+                <div class="download-card"><img data-asset="site.featuredIcon" src="/assets/retro/computer.png" data-fallback="/assets/retro/computer.png" alt="" /><div><a href="#" data-copy="featuredName">DreamStream Player 2.0</a><p data-copy="featuredCopy">Faster. Better. Totally Rad.</p></div></div>
                 <a class="center-link" href="#" data-copy="featuredLink">Download Now!</a>
               </section>
               <section class="web-box purple-box"><h2 data-copy="topFive">TOP 5 THIS WEEK</h2><ol><li><a href="#">Star Quest</a></li><li><a href="#">Retro City</a></li><li><a href="#">Neon Riders</a></li><li><a href="#">Space Cops</a></li><li><a href="#">Dance Nation</a></li></ol></section>
@@ -182,9 +198,9 @@
           <footer class="old-web-footer">
             <div class="footer-badges"><img data-asset="site.badgeResolution" src="/assets/retro/badge-resolution.png" alt="" /><img data-asset="site.badgeHtml" src="/assets/retro/badge-html.png" alt="" /></div>
             <div class="footer-copy">
-              <strong data-config-oldweb="copyright">© 1998-1999 PixelStream 99. All rights reserved.</strong>
+              <strong data-config-oldweb="copyright">© 1998-1999 DreamStream 99. All rights reserved.</strong>
               <span><span data-config-oldweb="bestViewed">Best viewed at 800×600 · 16-bit color</span> · <span data-config-oldweb="browserHint">IE 5 / Netscape 4.7</span></span>
-              <span>Webmaster: <a href="#" data-config-oldweb="webmaster">webmaster@pixelstream99.local</a></span>
+              <span>Webmaster: <a href="#" data-config-oldweb="webmaster">webmaster@dreamstream99.local</a></span>
               <span><a href="#">About Us</a> | <a href="#">Terms of Use</a> | <a href="#">Privacy</a> | <a href="#">Contact</a></span>
             </div>
             <div class="visitor-counter"><span>You are visitor #</span><b data-config-oldweb="visitorNumber">00487213</b><span data-config-oldweb="lastUpdated">Last updated: Aug. 17, 1999</span></div>
@@ -258,7 +274,7 @@
       <button class="start-button" tabindex="-1"><img class="start-logo" data-asset="startLogo" data-fallback="/assets/retro/windows-fallback.png" alt="" /><strong data-copy="taskStart">开始</strong></button>
       <div class="quick-launch"><img src="/assets/retro/ie.png" data-asset="windowIcon" data-fallback="/assets/retro/ie.png" alt="" /><img src="/assets/retro/mail-small.png" alt="" /><img src="/assets/retro/folder.png" alt="" /></div>
       <div class="task-divider"></div>
-      <button class="task-button active" type="button" data-task-window="media"><img src="/assets/retro/ie.png" data-asset="windowIcon" data-fallback="/assets/retro/ie.png" alt="" /><span data-config-oldweb="mediaBrand">PixelStream 99</span></button>
+      <button class="task-button active" type="button" data-task-window="media"><img src="/assets/retro/ie.png" data-asset="windowIcon" data-fallback="/assets/retro/ie.png" alt="" /><span data-config-oldweb="mediaBrand">DreamStream 99</span></button>
       <button class="task-button active" type="button" data-task-window="chat"><img data-asset="site.chatIcon" src="/assets/retro/chat.png" data-fallback="/assets/retro/chat.png" alt="" /><span data-config-oldweb="chatBrand">Dial-Up Lounge</span></button>
       <div class="task-spacer"></div>
       <div class="tray"><img src="/assets/retro/speaker.png" alt="" /><span class="tray-led" id="trayLed"></span><span id="taskbarClock">00:00</span></div>

@@ -50,28 +50,28 @@ function installConfiguredFonts() {
   style.id = 'wt-configured-fonts';
   style.textContent = `
     @font-face {
-      font-family: "WT MS Sans Pixel";
+      font-family: "Pixelated MS Sans Serif";
       src: url("${q(fonts.latinRegularUrl)}") format("woff");
       font-weight: 400;
       font-style: normal;
       font-display: block;
     }
     @font-face {
-      font-family: "WT MS Sans Pixel";
+      font-family: "Pixelated MS Sans Serif";
       src: url("${q(fonts.latinBoldUrl || fonts.latinRegularUrl)}") format("woff");
       font-weight: 700;
       font-style: normal;
       font-display: block;
     }
     @font-face {
-      font-family: "WT WQY Bitmap Song";
+      font-family: "WenQuanYi Bitmap Song 12px";
       src: url("${q(fonts.cjkUrl)}") format("truetype");
       font-weight: 400;
       font-style: normal;
       font-display: block;
     }
     @font-face {
-      font-family: "WT WQY Bitmap Song";
+      font-family: "WenQuanYi Bitmap Song 12px";
       src: url("${q(fonts.cjkUrl)}") format("truetype");
       font-weight: 700;
       font-style: normal;

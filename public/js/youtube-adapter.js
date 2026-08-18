@@ -1,3 +1,6 @@
+const API_URL = 'https://www.youtube.com/iframe_api';
+const API_TIMEOUT_MS = 10000;
+const PLAYER_TIMEOUT_MS = 10000;
 let apiPromise = null;
 
 function loadYouTubeApi() {
@@ -5,20 +8,54 @@ function loadYouTubeApi() {
   if (apiPromise) return apiPromise;
 
   apiPromise = new Promise((resolve, reject) => {
+    let settled = false;
     const previousReady = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
+    let script = document.querySelector('script[data-youtube-iframe-api]');
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      script?.removeEventListener('error', onError);
+      if (window.onYouTubeIframeAPIReady === onReady) {
+        window.onYouTubeIframeAPIReady = previousReady;
+      }
+    };
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      script?.remove();
+      reject(error);
+    };
+    const onError = () => fail(new Error('YouTube IFrame API 加载失败'));
+    const onReady = () => {
       if (typeof previousReady === 'function') previousReady();
+      if (settled) return;
+      if (!window.YT?.Player) return fail(new Error('YouTube IFrame API 未正确初始化'));
+      settled = true;
+      cleanup();
       resolve(window.YT);
     };
+    const timeout = setTimeout(() => fail(new Error('YouTube IFrame API 加载超时')), API_TIMEOUT_MS);
 
-    const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api';
-    script.async = true;
-    script.onerror = () => reject(new Error('YouTube IFrame API 加载失败'));
-    document.head.appendChild(script);
+    window.onYouTubeIframeAPIReady = onReady;
+    if (!script) {
+      script = document.createElement('script');
+      script.src = API_URL;
+      script.async = true;
+      script.dataset.youtubeIframeApi = 'true';
+      document.head.appendChild(script);
+    }
+    script.addEventListener('error', onError, { once: true });
+  }).catch((error) => {
+    apiPromise = null;
+    throw error;
   });
 
   return apiPromise;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export class YouTubeAdapter {
@@ -27,19 +64,45 @@ export class YouTubeAdapter {
     this.callbacks = callbacks;
     this.player = null;
     this.ready = false;
-    this.mediaId = null;
-    this.suppressUntil = 0;
+    this.videoId = null;
     this.creationPromise = null;
+    this.isApplyingRemoteState = false;
+    this.remoteApplyGeneration = 0;
+    this.shouldBePlaying = false;
+    this.autoplayRecoveryPromise = null;
   }
 
   async ensurePlayer() {
     if (this.player && this.ready) return this.player;
     if (this.creationPromise) return this.creationPromise;
 
-    this.creationPromise = (async () => {
-      const YT = await loadYouTubeApi();
-      await new Promise((resolve, reject) => {
-        this.player = new YT.Player(this.hostElement, {
+    this.creationPromise = this.createPlayer().catch((error) => {
+      this.resetPlayer();
+      this.callbacks.onInitError?.(error);
+      throw error;
+    });
+    return this.creationPromise;
+  }
+
+  async createPlayer() {
+    const YT = await loadYouTubeApi();
+    this.hostElement.replaceChildren();
+    const slot = document.createElement('div');
+    this.hostElement.append(slot);
+
+    await new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        if (error) reject(error);
+        else resolve();
+      };
+      const timeout = setTimeout(() => finish(new Error('YouTube 播放器初始化超时')), PLAYER_TIMEOUT_MS);
+
+      try {
+        this.player = new YT.Player(slot, {
           width: '100%',
           height: '100%',
           playerVars: {
@@ -52,84 +115,148 @@ export class YouTubeAdapter {
           events: {
             onReady: () => {
               this.ready = true;
-              resolve();
+              finish();
             },
             onStateChange: (event) => this.handleStateChange(event),
             onPlaybackRateChange: () => this.handleRateChange(),
-            onAutoplayBlocked: () => this.callbacks.onAutoplayBlocked?.(),
+            onAutoplayBlocked: () => this.handleAutoplayBlocked(),
             onError: (event) => this.callbacks.onError?.(event.data),
           },
         });
-        setTimeout(() => {
-          if (!this.ready) reject(new Error('YouTube 播放器初始化超时'));
-        }, 12000);
-      });
-      return this.player;
-    })();
+      } catch (error) {
+        finish(error);
+      }
+    });
 
-    return this.creationPromise;
-  }
-
-  isSuppressed() {
-    return Date.now() < this.suppressUntil;
-  }
-
-  suppress(ms = 1100) {
-    this.suppressUntil = Math.max(this.suppressUntil, Date.now() + ms);
+    return this.player;
   }
 
   handleStateChange(event) {
-    if (this.isSuppressed() || !this.player) return;
-    const YT = window.YT;
-    if (event.data === YT.PlayerState.PLAYING) {
+    if (!this.player) return;
+    const states = window.YT.PlayerState;
+    if (event.data === states.BUFFERING) return;
+    if (this.isApplyingRemoteState) return;
+
+    if (event.data === states.PLAYING) {
       this.callbacks.onPlay?.(this.getCurrentTime());
-    } else if (event.data === YT.PlayerState.PAUSED) {
+    } else if (event.data === states.PAUSED) {
       this.callbacks.onPause?.(this.getCurrentTime());
+    } else if (event.data === states.ENDED) {
+      this.callbacks.onEnded?.(Math.max(this.getCurrentTime(), this.getDuration()));
     }
   }
 
   handleRateChange() {
-    if (this.isSuppressed() || !this.player) return;
+    if (this.isApplyingRemoteState || !this.player) return;
     this.callbacks.onRateChange?.(this.getPlaybackRate(), this.getCurrentTime());
   }
 
-  async load(mediaId, position = 0) {
-    await this.ensurePlayer();
-    this.suppress(1400);
-    this.mediaId = mediaId;
-    this.player.cueVideoById({ videoId: mediaId, startSeconds: Math.max(0, position) });
+  handleAutoplayBlocked() {
+    if (!this.shouldBePlaying) return;
+    this.recoverMutedAutoplay().catch((error) => this.callbacks.onError?.(error.message));
+  }
+
+  async runRemoteOperation(operation) {
+    const generation = ++this.remoteApplyGeneration;
+    this.isApplyingRemoteState = true;
+    try {
+      return await operation();
+    } finally {
+      if (generation === this.remoteApplyGeneration) this.isApplyingRemoteState = false;
+    }
+  }
+
+  async setSupportedPlaybackRate(rate) {
+    const requested = Number(rate) || 1;
+    const available = this.player?.getAvailablePlaybackRates?.();
+    const supported = Array.isArray(available) && available.length ? available : [1];
+    if (!supported.some((value) => Math.abs(value - requested) < 0.001)) return false;
+    if (Math.abs(this.getPlaybackRate() - requested) > 0.001) this.player.setPlaybackRate(requested);
+    return true;
   }
 
   async apply(playback, targetSeconds) {
     await this.ensurePlayer();
-    this.suppress(1200);
+    this.shouldBePlaying = !playback.paused;
 
-    if (this.mediaId !== playback.mediaId) {
-      await this.load(playback.mediaId, targetSeconds);
-    } else {
-      const drift = Math.abs(this.getCurrentTime() - targetSeconds);
-      if (drift > (playback.paused ? 0.35 : 0.9)) {
-        this.player.seekTo(Math.max(0, targetSeconds), true);
+    await this.runRemoteOperation(async () => {
+      const position = Math.max(0, targetSeconds);
+      const changedVideo = this.videoId !== playback.videoId;
+      if (changedVideo) {
+        this.videoId = playback.videoId;
+        if (playback.paused) this.player.cueVideoById({ videoId: playback.videoId, startSeconds: position });
+        else this.player.loadVideoById({ videoId: playback.videoId, startSeconds: position });
+      } else {
+        const drift = Math.abs(this.getCurrentTime() - position);
+        const threshold = playback.paused ? 0.35 : 1.25;
+        if (drift > threshold) this.player.seekTo(position, true);
       }
-    }
 
-    const currentRate = this.getPlaybackRate();
-    if (Math.abs(currentRate - playback.playbackRate) > 0.001) {
-      this.player.setPlaybackRate(playback.playbackRate);
-    }
+      await this.setSupportedPlaybackRate(playback.playbackRate);
+      if (playback.paused) {
+        const state = this.player.getPlayerState?.();
+        if (state !== window.YT.PlayerState.CUED && state !== window.YT.PlayerState.PAUSED) {
+          this.player.pauseVideo();
+        }
+        await delay(0);
+      } else {
+        this.player.playVideo();
+        await this.ensurePlaybackStarted();
+      }
+    });
+  }
 
-    if (playback.paused) this.player.pauseVideo();
-    else this.player.playVideo();
+  async ensurePlaybackStarted() {
+    const started = await this.waitForPlayerState(window.YT.PlayerState.PLAYING, 1600);
+    if (!started && this.shouldBePlaying) await this.recoverMutedAutoplay();
+  }
+
+  waitForPlayerState(expectedState, timeoutMs) {
+    return new Promise((resolve) => {
+      const startedAt = performance.now();
+      const check = () => {
+        if (!this.player || !this.shouldBePlaying) return resolve(false);
+        if (this.player.getPlayerState?.() === expectedState) return resolve(true);
+        if (performance.now() - startedAt >= timeoutMs) return resolve(false);
+        requestAnimationFrame(check);
+      };
+      check();
+    });
+  }
+
+  async recoverMutedAutoplay() {
+    if (this.autoplayRecoveryPromise) return this.autoplayRecoveryPromise;
+    this.autoplayRecoveryPromise = (async () => {
+      this.player?.mute?.();
+      this.player?.playVideo?.();
+      this.callbacks.onMutedAutoplay?.();
+      await this.waitForPlayerState(window.YT.PlayerState.PLAYING, 2200);
+    })().finally(() => {
+      this.autoplayRecoveryPromise = null;
+    });
+    return this.autoplayRecoveryPromise;
+  }
+
+  unmute() {
+    if (!this.player || !this.ready) return;
+    this.player.unMute?.();
+    if (this.shouldBePlaying) this.player.playVideo?.();
   }
 
   correctDrift(targetSeconds, paused) {
-    if (!this.player || !this.ready || this.isSuppressed()) return;
+    if (!this.player || !this.ready || this.isApplyingRemoteState) return;
     const drift = this.getCurrentTime() - targetSeconds;
-    const threshold = paused ? 0.4 : 1.15;
-    if (Math.abs(drift) > threshold) {
-      this.suppress(700);
+    const threshold = paused ? 0.35 : 1.25;
+    if (Math.abs(drift) <= threshold) return;
+    this.runRemoteOperation(async () => {
       this.player.seekTo(Math.max(0, targetSeconds), true);
-    }
+      await delay(0);
+    });
+  }
+
+  async retry(playback, targetSeconds) {
+    this.resetPlayer();
+    return this.apply(playback, targetSeconds);
   }
 
   getCurrentTime() {
@@ -152,11 +279,24 @@ export class YouTubeAdapter {
     return data?.title || '';
   }
 
-  destroy() {
-    this.player?.destroy?.();
+  resetPlayer() {
+    try {
+      this.player?.destroy?.();
+    } catch {
+      // A half-created cross-origin player may reject destruction; replacing the host is sufficient.
+    }
+    this.hostElement.replaceChildren();
     this.player = null;
     this.ready = false;
-    this.mediaId = null;
+    this.videoId = null;
     this.creationPromise = null;
+    this.isApplyingRemoteState = false;
+    this.shouldBePlaying = false;
+    this.autoplayRecoveryPromise = null;
+    this.remoteApplyGeneration += 1;
+  }
+
+  destroy() {
+    this.resetPlayer();
   }
 }
